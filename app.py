@@ -2013,19 +2013,32 @@ def report_router():
                 alert_name = sanitize_for_pdf(a.get("alert", ""))
                 owasp_cat = sanitize_for_pdf(map_to_owasp(a.get("alert", "")))
                 
+                pdf.set_x(10)
                 pdf.set_font("Arial", "B", 11)
                 pdf.set_fill_color(241, 245, 249)
-                pdf.cell(0, 8, f" {i}. {alert_name} [{risk}]", ln=True, fill=True)
+                pdf.cell(190, 8, f" {i}. {alert_name} [{risk}]", fill=True)
+                pdf.ln(8)
                 
+                pdf.set_x(10)
                 pdf.set_font("Arial", "I", 9)
                 pdf.set_text_color(100, 100, 100)
-                pdf.cell(0, 6, f"   OWASP Category: {owasp_cat}", ln=True)
+                pdf.cell(190, 6, f"   OWASP Category: {owasp_cat}")
+                pdf.ln(6)
                 
                 pdf.set_font("Arial", "", 9)
                 pdf.set_text_color(0, 0, 0)
-                pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Description: {a.get('description', 'N/A')}"))
+                pdf.set_x(10)
+                try:
+                    pdf.multi_cell(190, 5, sanitize_for_pdf(f"   Description: {a.get('description', 'N/A')}"))
+                except:
+                    pass
+                
                 pdf.set_font("Arial", "B", 9)
-                pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Remediation: {a.get('solution', 'N/A')}"))
+                pdf.set_x(10)
+                try:
+                    pdf.multi_cell(190, 5, sanitize_for_pdf(f"   Remediation: {a.get('solution', 'N/A')}"))
+                except:
+                    pass
                 pdf.ln(5)
 
             pdf_bytes = pdf.output()
