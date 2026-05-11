@@ -1,0 +1,289 @@
+Alert,Risk,URL,Solution
+Technology Fingerprint,Info,http://example.com,
+Missing Anti-clickjacking Header,Medium,http://example.com/,"Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app.
+If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's ""frame-ancestors"" directive."
+Content Security Policy (CSP) Header Not Set,Medium,http://example.com/,"Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+X-Content-Type-Options Header Missing,Low,http://example.com/,"Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.
+If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing."
+Content Security Policy (CSP) Header Not Set,Medium,http://example.com/sitemap.xml,"Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header."
+Content Security Policy (CSP) Header Not Set,Medium,http://example.com/robots.txt,"Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header."
+Missing Anti-clickjacking Header,Medium,http://example.com,"Modern Web browsers support the Content-Security-Policy and X-Frame-Options HTTP headers. Ensure one of them is set on all web pages returned by your site/app.
+If you expect the page to be framed only by pages on your server (e.g. it's part of a FRAMESET) then you'll want to use SAMEORIGIN, otherwise if you never expect the page to be framed, you should use DENY. Alternatively consider implementing Content Security Policy's ""frame-ancestors"" directive."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Content Security Policy (CSP) Header Not Set,Medium,http://example.com,"Ensure that your web server, application server, load balancer, etc. is configured to set the Content-Security-Policy header."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+X-Content-Type-Options Header Missing,Low,http://example.com,"Ensure that the application/web server sets the Content-Type header appropriately, and that it sets the X-Content-Type-Options header to 'nosniff' for all web pages.
+If possible, ensure that the end user uses a standards-compliant and modern web browser that does not perform MIME-sniffing at all, or that can be directed by the web application/web server to not perform MIME-sniffing."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/robots.txt,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com/sitemap.xml,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."
+Retrieved from Cache,Informational,http://example.com,"Validate that the response does not contain sensitive, personal or user-specific information. If it does, consider the use of the following HTTP response headers, to limit, or prevent the content being stored and retrieved from the cache by another user:
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+Expires: 0
+This configuration directs both HTTP 1.0 and HTTP 1.1 compliant caching servers to not store the response, and to not retrieve the response (without validation) from the cache, in response to a similar request."

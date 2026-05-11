@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Settings - VigiScan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 2rem;
+        }
+        .settings-container {
+            width: 100%;
+            max-width: 500px;
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(20px);
+            padding: 2.5rem;
+            border-radius: 2rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .home-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+        .home-btn:hover { transform: translateX(-5px); filter: brightness(1.2); }
+        
+        h2 { font-size: 2rem; margin-bottom: 2rem; color: #38bdf8; }
+        
+        .status-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .status-box p { margin-bottom: 0.5rem; font-size: 0.875rem; color: #94a3b8; }
+        .status-box p strong { color: white; }
+
+        .setting-item { margin-bottom: 1.5rem; }
+        .setting-item label { display: block; margin-bottom: 0.75rem; font-weight: 600; font-size: 0.875rem; color: #94a3b8; }
+        .setting-item input[type="password"] {
+            width: 100%;
+            padding: 1rem;
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            color: white;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        .setting-item input:focus { border-color: #38bdf8; }
+
+        .save-btn {
+            width: 100%;
+            padding: 1rem;
+            background: #38bdf8;
+            color: #0f172a;
+            border: none;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .save-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.3); }
+
+        .flash-messages {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #10b981;
+        }
+        ul { list-style: none; }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <a href="/dashboard" class="home-btn"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        
+        <h2>⚙️ Settings</h2>
+
+        <div class="status-box">
+            <p><strong>Logged in as:</strong> {{ user }}</p>
+            <p><strong>Two-Factor Status:</strong> 
+                {% if twofa_enabled %}
+                    <span style="color: #10b981;">● Enabled</span>
+                {% else %}
+                    <span style="color: #ef4444;">○ Disabled</span>
+                {% endif %}
+            </p>
+        </div>
+
+        <form method="POST" action="/settings">
+            <div class="setting-item">
+                <label for="password">Security Reset</label>
+                <input type="password" name="password" id="password" placeholder="Set new secure password">
+            </div>
+            <div class="setting-item" style="display: flex; align-items: center; gap: 0.75rem;">
+                <input type="checkbox" name="2fa" id="2fa" {% if twofa_enabled %}checked{% endif %} style="width: 1.25rem; height: 1.25rem; cursor: pointer;">
+                <label for="2fa" style="margin: 0;">Multi-Factor Authentication (MFA)</label>
+            </div>
+            <button type="submit" class="save-btn">Apply Configuration</button>
+        </form>
+
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <ul>
+                {% for category, message in messages %}
+                  <li><i class="fas fa-check-circle"></i> {{ message }}</li>
+                {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Profile - VigiScan</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 2rem;
+        }
+        .profile-card {
+            width: 100%;
+            max-width: 450px;
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(20px);
+            padding: 3rem;
+            border-radius: 2.5rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .home-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+        }
+        .home-btn:hover { transform: translateX(-5px); filter: brightness(1.2); }
+
+        .avatar {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            border-radius: 50%;
+            margin: 0 auto 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: #0f172a;
+            box-shadow: 0 10px 20px rgba(56, 189, 248, 0.2);
+        }
+        
+        h2 { font-size: 2.25rem; margin-bottom: 0.5rem; color: #38bdf8; }
+        .role-badge {
+            display: inline-block;
+            padding: 0.25rem 1rem;
+            background: rgba(129, 140, 248, 0.1);
+            color: #818cf8;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2rem;
+        }
+        
+        .info-group {
+            text-align: left;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 1.5rem;
+            border-radius: 1.25rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .info-item:last-child { margin-bottom: 0; }
+        .label { color: #94a3b8; font-size: 0.875rem; }
+        .value { font-weight: 600; color: white; }
+    </style>
+</head>
+<body>
+    <div class="profile-card">
+        <a href="/dashboard" class="home-btn"><i class="fas fa-arrow-left"></i> Home</a>
+        
+        <div class="avatar">
+            <i class="fas fa-user-shield"></i>
+        </div>
+        
+        <h2>{{ username }}</h2>
+        <div class="role-badge">{{ role }}</div>
+
+        <div class="info-group">
+            <div class="info-item">
+                <span class="label">Identity</span>
+                <span class="value">@{{ username.lower() }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Access Level</span>
+                <span class="value">{{ role }}</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Account Status</span>
+                <span class="value" style="color: #10b981;">Active</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

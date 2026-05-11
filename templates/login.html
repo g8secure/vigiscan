@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enterprise Vulnerability Scanner - Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            margin: 0;
+        }
+
+        .login-container {
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            width: 350px;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            font-size: 26px;
+            color: #fff;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 6px;
+        }
+
+        input[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            border: none;
+            border-radius: 6px;
+            background-color: #ff9800;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #e68900;
+        }
+
+        .register-link {
+            margin-top: 10px;
+            display: block;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .error {
+            background-color: rgba(255,0,0,0.4);
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+            <svg width="60" height="60" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="rainbowGradLogin" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#ff0000;stop-opacity:1" />
+                        <stop offset="20%" style="stop-color:#ff7f00;stop-opacity:1" />
+                        <stop offset="40%" style="stop-color:#ffff00;stop-opacity:1" />
+                        <stop offset="60%" style="stop-color:#00ff00;stop-opacity:1" />
+                        <stop offset="80%" style="stop-color:#0000ff;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#8b00ff;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <path d="M21 2L4 9v11c0 9.4 7.3 18.2 17 20 9.7-1.8 17-10.6 17-20V9L21 2z" fill="url(#rainbowGradLogin)" />
+                <ellipse cx="21" cy="21" rx="7" ry="4.5" stroke="white" stroke-width="2" fill="none" />
+                <circle cx="21" cy="21" r="2.5" fill="white" />
+            </svg>
+            <h2 style="margin:0; font-size:2.2rem; background: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #8b00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; letter-spacing: -0.02em;">
+                VigiScan
+            </h2>
+        </div>
+        <h1 style="margin-top: 0; font-size: 1.2rem; opacity: 0.8; font-weight: 400;">🔐 Secure Access Terminal</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="error">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <form method="post">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <input type="submit" value="Login">
+        </form>
+        <a href="{{ url_for('register') }}" class="register-link">👉 Don't have an account? Register</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Enterprise Vulnerability Scanner</title>
+<style>
+body {
+    margin:0;
+    font-family:Arial,sans-serif;
+    color:white;
+    background:linear-gradient(-45deg,#ff5f6d,#ffc371,#24c6dc,#514a9d,#ff5f6d);
+    background-size:400% 400%;
+    animation:gradientAnimation 20s ease infinite;
+}
+@keyframes gradientAnimation{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+@keyframes fadeIn{0%{opacity:0;transform:translateY(20px);}100%{opacity:1;transform:translateY(0);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+
+input, input[type="datetime-local"], select, button {border-radius:5px;border:none;padding:10px;margin:5px 0;}
+button{cursor:pointer;transition:all 0.3s;}
+button:hover{opacity:0.9;}
+
+#loginPage,#twoFAPage,#landing{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;}
+#loginPage input,#twoFAPage input{width:250px;text-align:center;}
+#landing h1{font-size:48px;animation:fadeIn 1s ease forwards;}
+#landing p{font-size:20px;margin-bottom:40px;animation:fadeIn 1.5s ease forwards;}
+#landing button{padding:15px 30px;font-size:18px;color:white;background:#ff5f6d;border-radius:10px;animation:fadeIn 2s ease forwards;}
+#landing button:hover{background:#ffc371;transform:scale(1.1) rotate(-2deg);}
+
+#dashboard{display:none;}
+.header {display:flex;justify-content:space-between;align-items:center;padding:20px 40px;background:rgba(0,0,0,0.5);}
+.header h2 {color:#38bdf8;margin:0;}
+.header button {background:#ef4444;padding:10px 15px;color:white;border-radius:5px;}
+
+.nav {text-align:center;padding:15px;background:rgba(0,0,0,0.5); display: flex; justify-content: center; flex-wrap: nowrap; overflow-x: auto; gap: 10px;}
+.nav button {margin:10px;padding:12px 20px;background:#38bdf8;color:white;border-radius:8px;font-size:16px;}
+.nav button:hover{background:#0ea5e9;}
+
+.container {display:grid;grid-template-columns:2fr 1fr;gap:20px;padding:20px 40px;}
+.card {background:rgba(0,0,0,0.5);padding:20px;border-radius:15px;box-shadow:0 5px 15px rgba(0,0,0,0.3);}
+.full {grid-column:span 2;}
+.progress-container {background:#475569;border-radius:20px;margin:10px 0;height:20px;}
+.progress-bar {height:100%;width:0%;background:#38bdf8;border-radius:20px;text-align:center;font-size:12px;transition:width 0.3s ease;}
+.pulsing{animation:pulse 1s infinite;}
+@media (max-width:900px){.container{grid-template-columns:1fr;}.full{grid-column:span 1;}}
+</style>
+</head>
+<body>
+
+<!-- Landing Page -->
+<div id="landing">
+    <h1>Welcome to Enterprise Vulnerability Scanner ⚠️</h1>
+    <p>Scan, monitor, and manage vulnerabilities automatically.</p>
+    <button onclick="enterLogin()">Enter</button>
+</div>
+
+<!-- Login Page -->
+<div id="loginPage">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button onclick="submitLogin()">Login</button>
+    <div id="loginStatus" style="color:red;margin-top:10px;"></div>
+</div>
+
+<!-- 2FA Page -->
+<div id="twoFAPage">
+    <h2>Two-Factor Authentication</h2>
+    <p>Enter your 6-digit code from your authenticator app:</p>
+    <input type="text" id="twoFAcode" placeholder="123456"><br>
+    <button onclick="verify2FA()">Verify</button>
+    <div id="twoFAStatus" style="color:red;margin-top:10px;"></div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+<div class="header">
+<h2>📡 Enterprise Vulnerability Scanner ⚠️</h2>
+<button onclick="logout()">🔒 Logout</button>
+</div>
+
+<div class="nav">
+<button onclick="showSection('scan')">📡 Start Scan</button>
+<button onclick="showSection('alerts')">📊 Alerts</button>
+<button onclick="loadHistory()">🕒 History</button>
+<button onclick="showSection('recurring')">📅 Recurring Scans</button>
+
+<!-- ✅ ADDED DROPDOWN -->
+<select id="reportType">
+    <option value="pdf">📄 PDF Report</option>
+    <option value="html">🌐 HTML Report</option>
+    <option value="excel">📊 Excel Report</option>
+</select>
+
+<button onclick="downloadReport()">📥 Download Report</button>
+
+<button onclick="showSection('settings')">⚙️ Settings</button>
+</div>
+
+<div class="container">
+<div id="scan" class="card">
+<h3>Scan Target</h3>
+<input type="text" id="target" placeholder="http://testphp.vulnweb.com"><br>
+<label><input type="checkbox" name="scan_type" value="zap_full" checked> ZAP Full</label><br>
+<label><input type="checkbox" name="scan_type" value="nmap" checked> Nmap</label><br>
+<label for="schedule">Schedule Scan:</label><br>
+<input type="datetime-local" id="schedule"><br>
+<label for="recurring">Recurring:</label><br>
+<select id="recurring">
+<option value="none">None</option>
+<option value="daily">Daily</option>
+<option value="weekly">Weekly</option>
+<option value="monthly">Monthly</option>
+</select><br>
+<button onclick="startScan()">Start Scan</button><br><br>
+<b>Status:</b> <span id="status">Idle</span>
+<h4>Spider</h4>
+<div class="progress-container"><div id="spiderBar" class="progress-bar">0%</div></div>
+<h4>Active Scan</h4>
+<div class="progress-container"><div id="activeBar" class="progress-bar">0%</div></div>
+<h4>Nmap</h4>
+<div class="progress-container"><div id="nmapBar" class="progress-bar">0%</div></div>
+</div>
+
+<div id="recurring" class="card full" style="display:none;">
+<h3>Recurring Scans Dashboard</h3>
+<div id="recurringContent">No recurring scans scheduled.</div>
+</div>
+
+<div id="alerts" class="card">
+<h3>Alerts</h3>
+<div id="alertsContent">No alerts yet</div>
+</div>
+
+<div id="history" class="card full">
+<h3>Scan History</h3>
+<div id="historyContent">No history yet</div>
+</div>
+
+<div id="settings" class="card full" style="display:none;">
+<h3>Settings</h3>
+<p>Two-Factor Authentication (2FA)</p>
+<button onclick="enable2FA()">Enable 2FA</button>
+<p id="2faStatus" style="margin-top:10px;color:#34d399;">Not enabled</p>
+</div>
+</div>
+</div>
+
+<script>
+let tempUser=null;
+let recurringScans=[];
+
+function enterLogin(){document.getElementById('landing').style.display='none';document.getElementById('loginPage').style.display='flex';}
+function submitLogin(){const u=document.getElementById("username").value,p=document.getElementById("password").value;fetch('/login',{method:'POST',body:JSON.stringify({username:u,password:p}),headers:{'Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{if(d.success){tempUser=u;document.getElementById("loginPage").style.display='none';document.getElementById("twoFAPage").style.display='flex';}else{document.getElementById("loginStatus").innerText="Invalid username or password";}});}
+function verify2FA(){const c=document.getElementById("twoFAcode").value;fetch('/verify-2fa',{method:'POST',body:JSON.stringify({username:tempUser,code:c}),headers:{'Content-Type':'application/json'}}).then(r=>r.json()).then(d=>{if(d.success){document.getElementById("twoFAPage").style.display='none';document.getElementById("dashboard").style.display='block';}else{document.getElementById("twoFAStatus").innerText="Invalid 2FA code";}});}
+function showSection(s){["scan","alerts","history","recurring","settings"].forEach(x=>document.getElementById(x).style.display='none');document.getElementById(s).style.display='block'; const element = document.getElementById(s); if (element) { element.scrollIntoView({ behavior: 'smooth', block: 'start' }); } if(s==='recurring')updateRecurringPanel();}
+function startScan(){let t=document.getElementById("target").value;if(!t){alert("Enter a target");return;}const st=document.getElementById("schedule").value,r=document.getElementById("recurring").value,status=document.getElementById("status");status.classList.add("pulsing");const run=()=>{runScan(t);if(r!=="none")addRecurringScan(t,r,st);};if(st){const now=new Date(),sch=new Date(st),delay=sch-now;if(delay<=0){alert("Scheduled time must be in future");status.innerText="Idle";status.classList.remove("pulsing");return;}status.innerText=`Scheduled for ${sch.toLocaleString()}`;setTimeout(run,delay);}else run();}
+function addRecurringScan(t,r,st){const nr=st?new Date(st):new Date();recurringScans.push({target:t,recurring:r,nextRun:nr});scheduleRecurring(t,r);updateRecurringPanel();}
+function scheduleRecurring(t,r){let i;switch(r){case"daily":i=24*60*60*1000;break;case"weekly":i=7*24*60*60*1000;break;case"monthly":i=30*24*60*60*1000;}setInterval(()=>runScan(t),i);}
+function runScan(t){let fd=new FormData();fd.append("target",t);document.querySelectorAll('input[name="scan_type"]:checked').forEach(c=>fd.append("scan_type",c.value));fetch('/scan',{method:'POST',body:fd}).then(()=>{["spiderBar","activeBar","nmapBar"].forEach(a=>{let b=document.getElementById(a);b.style.width="0%";b.innerText="0%";});pollStatus();document.getElementById("status").innerText="Starting...";});}
+function updateBar(id,v){let b=document.getElementById(id);b.style.width=v+"%";b.innerText=v+"%";}
+function pollStatus(){fetch('/status').then(r=>r.json()).then(d=>{const s=document.getElementById("status");s.innerText=d.status;updateBar("spiderBar",d.spider);updateBar("activeBar",d.active);updateBar("nmapBar",d.nmap);if(d.status!=="✅ Scan completed")setTimeout(pollStatus,1500);else s.classList.remove("pulsing");loadAlerts();});}
+function updateRecurringPanel(){const p=document.getElementById("recurringContent");if(recurringScans.length===0){p.innerText="No recurring scans scheduled.";return;}p.innerHTML=recurringScans.map(r=>`<p>🌐 ${r.target} - ${r.recurring} | Next run: ${r.nextRun.toLocaleString()}</p>`).join("<hr>");}
+function loadAlerts(){fetch('/alerts').then(r=>r.json()).then(d=>{document.getElementById("alertsContent").innerHTML=d.alerts.map(a=>`<p>⚠️ ${a.alert} - ${a.risk}</p>`).join('')||"No alerts found";});}
+function loadHistory(){showSection('history');fetch('/history').then(r=>r.json()).then(d=>{document.getElementById("historyContent").innerHTML=d.map(s=>`<p>🌐 ${s[0]} <br> 📅 ${s[1]} <br> 🔴 High: ${s[2]} | 🟠 Medium: ${s[3]} | 🟡 Low: ${s[4]} | 🔵 Info: ${s[5]}</p><hr>`).join('')||"No history";});}
+
+<!-- ✅ UPDATED FUNCTION -->
+function downloadReport(){
+    let type = document.getElementById("reportType").value;
+    window.location.href = "/report?type=" + type;
+}
+
+function enable2FA(){document.getElementById("2faStatus").innerText="✅ Enabled";fetch('/enable-2fa',{method:'POST'});}
+function logout(){window.location.href="/logout";}
+</script>
+</body>
+</html>

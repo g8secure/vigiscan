@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Werkzeug
+reportlab
+fpdf
+zaproxy
+pyotp
+qrcode
+pandas
+python-nmap
+requests
+apscheduler

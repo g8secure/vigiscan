@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login 2FA - VigiScan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #4e54c8, #8f94fb);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: rgba(0,0,0,0.6);
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            width: 320px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 5px;
+            border: none;
+        }
+        button {
+            background-color: #6c63ff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #5952d4;
+        }
+        img {
+            margin: 15px 0;
+            width: 200px;
+            height: 200px;
+        }
+        .flash {
+            background: #ff4d4d;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Two-Factor Authentication</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <p>Scan this QR code with your authenticator app:</p>
+        <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR Code">
+
+        <form method="POST">
+            <input type="text" name="token" placeholder="Enter 6-digit token" required>
+            <button type="submit">Verify</button>
+        </form>
+    </div>
+</body>
+</html>
