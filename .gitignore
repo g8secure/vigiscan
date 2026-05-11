@@ -12,7 +12,7 @@ reports/
 juice-shop/
 .venv/
 venv/
-*.html
+
 fix_db_paths.py
 test.js
 test_lang.py
