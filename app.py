@@ -20,6 +20,7 @@ import re   # ✅ required for sanitization
 import requests   # ✅ added for CVE lookup
 
 from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
 
 app = Flask(__name__)
 # Use env var in production; fallback only for local dev
@@ -387,6 +388,7 @@ def login():
 def register():
     if request.method == 'POST':
         username = request.form['username'].strip()
+        email = request.form.get('email', '').strip()
         password = generate_password_hash(request.form['password'])
         otp_secret = pyotp.random_base32()
 
@@ -402,8 +404,8 @@ def register():
             is_first_user = c.fetchone()[0] == 0
 
             c.execute(
-                "INSERT INTO users (username,password,otp_secret,is_admin) VALUES (?,?,?,?)",
-                (username, password, otp_secret, 1 if is_first_user else 0)
+                "INSERT INTO users (username,email,password,otp_secret,is_admin) VALUES (?,?,?,?,?)",
+                (username, email, password, otp_secret, 1 if is_first_user else 0)
             )
             conn.commit()
             return redirect('/login')
@@ -415,6 +417,70 @@ def register():
             conn.close()
 
     return render_template("register.html")
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT username FROM users WHERE email=? AND email != ''", (email,))
+        user = c.fetchone()
+        conn.close()
+
+        if user:
+            # Generate secure token
+            serializer = URLSafeTimedSerializer(app.secret_key)
+            token = serializer.dumps(email, salt='password-reset-salt')
+            reset_url = url_for('reset_password', token=token, _external=True)
+            
+            # Send Email
+            if os.environ.get('VIGISCAN_MAIL_USER'):
+                try:
+                    msg = Message("Password Reset Request - VigiScan", 
+                                  sender=os.environ.get('VIGISCAN_MAIL_USER'), 
+                                  recipients=[email])
+                    msg.body = f"Hello {user[0]},\n\nTo reset your password, click the following link:\n{reset_url}\n\nIf you did not make this request, please ignore this email.\nThis link will expire in 1 hour."
+                    mail.send(msg)
+                    flash("A password reset link has been sent to your email address.", "success")
+                except Exception as e:
+                    flash(f"Failed to send email. Please check server configuration.", "danger")
+            else:
+                flash("Email service is not configured. Password reset unavailable.", "danger")
+        else:
+            # Don't reveal if email exists or not
+            flash("If that email is registered, a password reset link has been sent.", "success")
+
+    return render_template("forgot_password.html")
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    serializer = URLSafeTimedSerializer(app.secret_key)
+    try:
+        email = serializer.loads(token, salt='password-reset-salt', max_age=3600)
+    except Exception:
+        flash("The reset link is invalid or has expired.", "danger")
+        return redirect(url_for('forgot_password'))
+
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
+        elif len(password) < 6:
+            flash("Password must be at least 6 characters.", "danger")
+        else:
+            hashed_pw = generate_password_hash(password)
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("UPDATE users SET password=? WHERE email=?", (hashed_pw, email))
+            conn.commit()
+            conn.close()
+            flash("Your password has been securely updated! You may now log in.", "success")
+            return redirect(url_for('login'))
+
+    return render_template("reset_password.html")
 
 
 @app.route('/login_2fa', methods=['GET','POST'])
