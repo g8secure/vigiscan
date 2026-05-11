@@ -420,38 +420,43 @@ def register():
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT username FROM users WHERE email=? AND email != ''", (email,))
-        user = c.fetchone()
-        conn.close()
+    try:
+        if request.method == 'POST':
+            email = request.form.get('email', '').strip()
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT username FROM users WHERE email=? AND email != ''", (email,))
+            user = c.fetchone()
+            conn.close()
 
-        if user:
-            # Generate secure token
-            serializer = URLSafeTimedSerializer(app.secret_key)
-            token = serializer.dumps(email, salt='password-reset-salt')
-            reset_url = url_for('reset_password', token=token, _external=True)
-            
-            # Send Email
-            if os.environ.get('VIGISCAN_MAIL_USER'):
-                try:
-                    msg = Message("Password Reset Request - VigiScan", 
-                                  sender=os.environ.get('VIGISCAN_MAIL_USER'), 
-                                  recipients=[email])
-                    msg.body = f"Hello {user[0]},\n\nTo reset your password, click the following link:\n{reset_url}\n\nIf you did not make this request, please ignore this email.\nThis link will expire in 1 hour."
-                    mail.send(msg)
-                    flash("A password reset link has been sent to your email address.", "success")
-                except Exception as e:
-                    flash(f"Failed to send email. Please check server configuration.", "danger")
+            if user:
+                # Generate secure token
+                serializer = URLSafeTimedSerializer(app.secret_key)
+                token = serializer.dumps(email, salt='password-reset-salt')
+                reset_url = url_for('reset_password', token=token, _external=True)
+                
+                # Send Email
+                if os.environ.get('VIGISCAN_MAIL_USER'):
+                    try:
+                        msg = Message("Password Reset Request - VigiScan", 
+                                      sender=os.environ.get('VIGISCAN_MAIL_USER'), 
+                                      recipients=[email])
+                        msg.body = f"Hello {user[0]},\n\nTo reset your password, click the following link:\n{reset_url}\n\nIf you did not make this request, please ignore this email.\nThis link will expire in 1 hour."
+                        mail.send(msg)
+                        flash("A password reset link has been sent to your email address.", "success")
+                    except Exception as e:
+                        flash(f"Failed to send email. Please check server configuration. Error: {str(e)}", "danger")
+                else:
+                    flash("Email service is not configured. Password reset unavailable.", "danger")
             else:
-                flash("Email service is not configured. Password reset unavailable.", "danger")
-        else:
-            # Don't reveal if email exists or not
-            flash("If that email is registered, a password reset link has been sent.", "success")
+                # Don't reveal if email exists or not
+                flash("If that email is registered, a password reset link has been sent.", "success")
 
-    return render_template("forgot_password.html")
+        return render_template("forgot_password.html")
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        return f"Forgot Password Error: {str(e)}<br><pre>{error_trace}</pre>", 500
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
