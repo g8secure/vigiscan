@@ -436,10 +436,10 @@ def forgot_password():
                 reset_url = url_for('reset_password', token=token, _external=True)
                 
                 # Send Email
-                if os.environ.get('VIGISCAN_MAIL_USER'):
+                if _MAIL_CONFIGURED:
                     try:
                         msg = Message("Password Reset Request - VigiScan", 
-                                      sender=os.environ.get('VIGISCAN_MAIL_USER'), 
+                                      sender=_MAIL_USER, 
                                       recipients=[email])
                         msg.body = f"Hello {user[0]},\n\nTo reset your password, click the following link:\n{reset_url}\n\nIf you did not make this request, please ignore this email.\nThis link will expire in 1 hour."
                         mail.send(msg)
@@ -447,7 +447,8 @@ def forgot_password():
                     except Exception as e:
                         flash(f"Failed to send email. Please check server configuration. Error: {str(e)}", "danger")
                 else:
-                    flash("Email service is not configured. Password reset unavailable.", "danger")
+                    # Fallback for when email is not configured on the server
+                    flash(f"Email is not configured on this server. Here is your manual reset link: {reset_url}", "success")
             else:
                 # Don't reveal if email exists or not
                 flash("If that email is registered, a password reset link has been sent.", "success")
