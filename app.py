@@ -22,8 +22,14 @@ import requests   # ✅ added for CVE lookup
 from flask_mail import Mail, Message
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey123"
+# Use env var in production; fallback only for local dev
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-insecure-key-change-me')
 app.permanent_session_lifetime = timedelta(minutes=10)
+
+# ================= DATABASE PATH =================
+# On Render with a persistent disk mounted at /data, store the DB there.
+# Locally, falls back to the project directory.
+DB_PATH = os.path.join('/data', 'users.db') if os.path.isdir('/data') else os.path.join(os.path.dirname(__file__), 'users.db')
 
 # ================= EMAIL CONFIGURATION =================
 # To enable email alerts, replace placeholders with your real SMTP credentials.
@@ -163,7 +169,7 @@ KNOWLEDGE_BASE = {
 
 # ================= DATABASE =================
 def init_db():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -277,7 +283,7 @@ def init_db():
 
 def log_error(user, scan_id, message, traceback=""):
     try:
-        conn = sqlite3.connect("users.db")
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("INSERT INTO error_logs (user, scan_id, message, traceback, date) VALUES (?,?,?,?,?)",
                   (user, scan_id, str(message), str(traceback), datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')))
@@ -288,7 +294,7 @@ def log_error(user, scan_id, message, traceback=""):
 
 def log_activity(user, action, details=""):
     try:
-        conn = sqlite3.connect("users.db")
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("INSERT INTO audit_logs (user, action, details, date) VALUES (?,?,?,?)",
                   (user, action, str(details), datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')))
@@ -359,7 +365,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        conn = sqlite3.connect('users.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT id, username, password, otp_secret, email, is_admin FROM users WHERE username=?", (username,))
         user = c.fetchone()
@@ -388,7 +394,7 @@ def register():
             flash("Invalid username format", "danger")
             return redirect('/register')
 
-        conn = sqlite3.connect('users.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         try:
@@ -447,7 +453,7 @@ def login_2fa():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT settings FROM users WHERE username=?", (session.get("user"),))
     row = c.fetchone()
@@ -469,7 +475,7 @@ def save_language():
     data = request.get_json(silent=True) or {}
     lang = data.get("language", "en")
     
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT settings FROM users WHERE username=?", (session.get("user"),))
     row = c.fetchone()
@@ -492,7 +498,7 @@ def save_language():
 @app.route('/profile')
 @login_required
 def profile():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT username, is_admin FROM users WHERE username=?", (session.get("user"),))
     user = c.fetchone()
@@ -513,7 +519,7 @@ def logout():
 @app.route('/users')
 @login_required
 def users():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     # ✅ Return ID and Is_Admin status as well
     c.execute("SELECT id, username, is_admin FROM users")
@@ -548,7 +554,7 @@ def active_scans():
 @app.route('/admin/audit_logs')
 @admin_required
 def get_audit_logs():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT user, action, details, date FROM audit_logs ORDER BY id DESC LIMIT 100")
     rows = c.fetchall()
@@ -569,7 +575,7 @@ def admin_panel():
 @app.route('/admin/users')
 @admin_required
 def admin_users():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, username, is_admin FROM users")
     rows = c.fetchall()
@@ -585,7 +591,7 @@ def admin_users():
 @admin_required
 def delete_user(user_id):
     # Fetch username before deleting for log
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT username FROM users WHERE id=?", (user_id,))
     target_user = c.fetchone()
@@ -612,7 +618,7 @@ def add_user():
     hashed_pw = generate_password_hash(password)
     otp_secret = pyotp.random_base32()
 
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
         c.execute("INSERT INTO users (username, password, otp_secret, is_admin) VALUES (?,?,?,?)",
@@ -629,7 +635,7 @@ def add_user():
 @app.route('/admin/make_admin/<int:user_id>')
 @admin_required
 def make_admin(user_id):
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT username FROM users WHERE id=?", (user_id,))
     target_user = c.fetchone()
@@ -644,7 +650,7 @@ def make_admin(user_id):
 @app.route('/admin/error_logs')
 @admin_required
 def get_error_logs():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT user, scan_id, message, date FROM error_logs ORDER BY id DESC LIMIT 100")
     rows = c.fetchall()
@@ -657,7 +663,7 @@ def get_error_logs():
 @app.route('/admin/remove_admin/<int:user_id>')
 @admin_required
 def remove_admin(user_id):
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE users SET is_admin=0 WHERE id=?", (user_id,))
     conn.commit()
@@ -668,7 +674,7 @@ def remove_admin(user_id):
 @app.route('/api/assets')
 @login_required
 def get_assets():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, name, ip, domain, environment, criticality, is_internet_facing FROM assets")
     rows = c.fetchall()
@@ -691,7 +697,7 @@ def add_asset():
     criticality = data.get("criticality")
     internet = 1 if data.get("internet") else 0
 
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     # Basic logic to distinguish IP vs Domain
     ip = target if re.match(r'^\d{1,3}(\.\d{1,3}){3}$', target) else None
@@ -707,7 +713,7 @@ def add_asset():
 @app.route('/api/vulnerabilities')
 @login_required
 def get_all_vulnerabilities():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
         SELECT v.id, v.name, v.severity, v.risk_score, v.status, v.date_found, a.name, v.scan_id
@@ -729,7 +735,7 @@ def get_all_vulnerabilities():
 @app.route('/api/admin/delete_asset/<int:asset_id>', methods=['DELETE'])
 @login_required
 def delete_asset(asset_id):
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM assets WHERE id=?", (asset_id,))
     conn.commit()
@@ -775,7 +781,7 @@ LANGUAGES = {
 @app.route('/api/notifications')
 @login_required
 def get_notifications():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT id, type, message, is_read, date FROM notifications WHERE user=? ORDER BY id DESC LIMIT 20", (session.get("user"),))
     rows = c.fetchall()
@@ -785,7 +791,7 @@ def get_notifications():
 @app.route('/api/notifications/read/<int:notif_id>', methods=['POST'])
 @login_required
 def mark_notif_read(notif_id):
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE notifications SET is_read=1 WHERE id=? AND user=?", (notif_id, session.get("user")))
     conn.commit()
@@ -795,7 +801,7 @@ def mark_notif_read(notif_id):
 @app.route('/api/notifications/clear', methods=['POST'])
 @login_required
 def clear_notifs():
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE notifications SET is_read=1 WHERE user=?", (session.get("user"),))
     conn.commit()
@@ -813,7 +819,7 @@ def update_vuln_status():
     if new_status == "Accepted Risk" and not session.get("is_admin"):
          return jsonify({"error": "Admin approval required for risk acceptance"}), 403
 
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE vulnerabilities SET status=? WHERE id=?", (new_status, vuln_id))
     conn.commit()
@@ -831,7 +837,7 @@ def get_knowledge_base():
 @app.route('/api/knowledge_base/<int:article_id>')
 @login_required
 def get_knowledge_article(article_id):
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT * FROM knowledge_base WHERE id=? AND (is_public=1 OR author=?)", (article_id, session.get("user")))
     row = c.fetchone()
@@ -841,7 +847,7 @@ def get_knowledge_article(article_id):
         return jsonify({"error": "Article not found"}), 404
     
     # Increment view count
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE knowledge_base SET views=views+1 WHERE id=?", (article_id,))
     conn.commit()
@@ -874,7 +880,7 @@ def create_knowledge_article():
         return jsonify({"error": "Title and content are required"}), 400
     
     now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO knowledge_base (title, category, content, tags, author, created_date, updated_date, is_public) VALUES (?,?,?,?,?,?,?,?)",
               (title, category, content, tags, session.get("user"), now, now, 1 if is_public else 0))
@@ -899,7 +905,7 @@ def update_knowledge_article(article_id):
         return jsonify({"error": "Title and content are required"}), 400
     
     # Check ownership
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT author FROM knowledge_base WHERE id=?", (article_id,))
     row = c.fetchone()
@@ -920,7 +926,7 @@ def update_knowledge_article(article_id):
 @login_required
 def delete_knowledge_article(article_id):
     # Check ownership
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT author FROM knowledge_base WHERE id=?", (article_id,))
     row = c.fetchone()
@@ -941,7 +947,7 @@ def search_knowledge_base():
     query = request.args.get('q', '')
     category = request.args.get('category', '')
     
-    conn = sqlite3.connect('users.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
     sql = "SELECT id, title, category, tags, author, created_date, updated_date, views FROM knowledge_base WHERE (is_public=1 OR author=?)"
@@ -996,7 +1002,7 @@ def map_to_compliance(alert_name):
 
 # ================= REMEDIATION TRACKING =================
 def track_remediation(target, current_alerts):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT alerts FROM scans WHERE target=? AND status='Completed' ORDER BY id DESC LIMIT 1 OFFSET 1", (target,))
     row = c.fetchone()
@@ -1073,7 +1079,7 @@ def enrich_with_intel(alert_name):
 # ================= NOTIFICATIONS =================
 def add_notification(user, ntype, message):
     try:
-        conn = sqlite3.connect("users.db")
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("INSERT INTO notifications (user, type, message, date) VALUES (?,?,?,?)",
                   (user, ntype, message, datetime.utcnow().isoformat()))
@@ -1300,7 +1306,7 @@ def run_scans(target, scan_id, start_phase="Nmap", user_email=None):
         job["fixed"] = fixed_vulnerabilities
 
         # ✅ VULNERABILITY LIFECYCLE TRACKING
-        conn = sqlite3.connect("users.db")
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
         # Try to find associated asset
@@ -1372,7 +1378,7 @@ def run_scans(target, scan_id, start_phase="Nmap", user_email=None):
 @app.route('/settings')
 @login_required
 def settings():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT otp_secret FROM users WHERE username=?", (session.get("user"),))
     row = c.fetchone()
@@ -1386,7 +1392,7 @@ def update_settings():
     new_password = request.form.get("password")
     enable_2fa = request.form.get("2fa") == "on"
 
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     # ✅ Update password if provided
@@ -1488,7 +1494,7 @@ def scan():
 @app.route('/resume/<scan_id>', methods=['POST'])
 @login_required
 def resume_scan(scan_id):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT target, profile, current_phase FROM scans WHERE scan_id=? AND user=?", (scan_id, session.get("user")))
     row = c.fetchone()
@@ -1644,7 +1650,7 @@ def get_schedules():
 @app.route('/api/trends')
 @login_required
 def get_trends():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT date, alerts FROM scans WHERE user=? ORDER BY date ASC", (session.get("user"),))
     rows = c.fetchall()
@@ -1675,7 +1681,7 @@ def delete_scan(scan_id):
     if not session.get("is_admin"):
         return jsonify({"error": "Only admins can delete scans"}), 403
     
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM scans WHERE scan_id=?", (scan_id,))
     conn.commit()
@@ -1710,7 +1716,7 @@ def scan_result(scan_id):
 
     if not job:
         # Fallback to database
-        conn = sqlite3.connect("users.db")
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT target, status, alerts, fixed FROM scans WHERE scan_id=?", (scan_id,))
         row = c.fetchone()
@@ -1789,7 +1795,7 @@ def terminate_scan(scan_id):   # ✅ renamed function
 @app.route('/history')
 @login_required
 def history():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     # ✅ Updated column selection
     is_admin = session.get("is_admin", False)
@@ -1866,7 +1872,7 @@ def report_router():
     if not scan_id:
         return "scan_id missing", 400
 
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     try:
@@ -1899,7 +1905,7 @@ def report_router():
     for a in alerts:
         a["last_detected"] = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         # Simple heuristic: find earlier scans for same target and same alert
-        conn_hist = sqlite3.connect("users.db")
+        conn_hist = sqlite3.connect(DB_PATH)
         c_hist = conn_hist.cursor()
         c_hist.execute("SELECT date FROM scans WHERE target=? AND alerts LIKE ? ORDER BY id ASC LIMIT 1", 
                        (target, f'%"{a.get("alert")}"%'))
@@ -2091,4 +2097,5 @@ def report_router():
 
 # ================= RUN =================
 if __name__ == '__main__':
-    app.run(debug=True)
+    debug_mode = os.environ.get('FLASK_ENV', 'production') != 'production'
+    app.run(debug=debug_mode, host='0.0.0.0')

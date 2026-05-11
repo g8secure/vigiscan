@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: vigiscan
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: VIGISCAN_MAIL_USER
+        sync: false
+      - key: VIGISCAN_MAIL_PASS
+        sync: false
+    disk:
+      name: vigiscan-data
+      mountPath: /data
+      sizeGB: 1
