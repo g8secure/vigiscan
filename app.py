@@ -2027,7 +2027,8 @@ def report_router():
             pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Remediation: {a.get('solution', 'N/A')}"))
             pdf.ln(5)
 
-        response = make_response(pdf.output(dest='S').encode('latin-1', 'replace'))
+        pdf_bytes = pdf.output()
+        response = make_response(bytes(pdf_bytes))
         response.headers["Content-Type"] = "application/pdf"
         response.headers["Content-Disposition"] = f"attachment; filename=VigiScan_{target}_Report.pdf"
         return response
