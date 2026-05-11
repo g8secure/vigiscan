@@ -1242,28 +1242,47 @@ def run_scans(target, scan_id, start_phase="Nmap", user_email=None):
                     job["alerts"].append({"alert": "API Schema Import Failed", "risk": "Info", "path": api_url, "description": f"Failed to import from {api_url}: {e}"})
 
             job["current_phase"] = "Spider"
-            zap.urlopen(target)
-            spider_id = zap.spider.scan(target)
-            while int(zap.spider.status(spider_id)) < 100:
-                if job.get("terminated"):
-                    job["status"] = "Terminated"
-                    return
-                job["spider"] = int(zap.spider.status(spider_id))
-                job["progress"] = 30 + int(job["spider"] * 0.3)
-                time.sleep(0.5)
-            job["spider"] = 100
+            try:
+                zap.urlopen(target)
+                spider_id = zap.spider.scan(target)
+                while int(zap.spider.status(spider_id)) < 100:
+                    if job.get("terminated"):
+                        job["status"] = "Terminated"
+                        return
+                    job["spider"] = int(zap.spider.status(spider_id))
+                    job["progress"] = 30 + int(job["spider"] * 0.3)
+                    time.sleep(0.5)
+                job["spider"] = 100
+            except Exception as ze:
+                print(f"⚠️ ZAP Connection failed: {ze}")
+                log_error(job["user"], scan_id, f"ZAP Proxy not reachable: {str(ze)}")
+                job["alerts"].append({
+                    "alert": "Scanner Core Unavailable",
+                    "risk": "Info",
+                    "path": "System",
+                    "description": "The ZAP vulnerability engine is not running on this server (Render). Deep web scanning skipped.",
+                    "solution": "Deploy via Docker with ZAP installed or run locally."
+                })
+                use_zap_spider = False
+                use_zap_ascan = False
+                job["spider"] = 100
+
 
         if use_zap_ascan:
             job["current_phase"] = "Active Scan"
-            ascan_id = zap.ascan.scan(target)
-            while int(zap.ascan.status(ascan_id)) < 100:
-                if job.get("terminated"):
-                    job["status"] = "Terminated"
-                    return
-                job["active"] = int(zap.ascan.status(ascan_id))
-                job["progress"] = 60 + int(job["active"] * 0.4)
-                time.sleep(1)
-            job["active"] = 100
+            try:
+                ascan_id = zap.ascan.scan(target)
+                while int(zap.ascan.status(ascan_id)) < 100:
+                    if job.get("terminated"):
+                        job["status"] = "Terminated"
+                        return
+                    job["active"] = int(zap.ascan.status(ascan_id))
+                    job["progress"] = 60 + int(job["active"] * 0.4)
+                    time.sleep(1)
+                job["active"] = 100
+            except Exception as ae:
+                print(f"⚠️ ZAP Active Scan failed: {ae}")
+                job["active"] = 100
 
         # Cleanup Auth Rule
         try:
@@ -1273,7 +1292,11 @@ def run_scans(target, scan_id, start_phase="Nmap", user_email=None):
 
         # Collect results if ZAP was used at all
         if profile != "targeted_ports" and (use_zap_spider or use_zap_ascan):
-            zap_alerts = zap.core.alerts(baseurl=target)
+            try:
+                zap_alerts = zap.core.alerts(baseurl=target)
+            except Exception:
+                zap_alerts = []
+                
             for a in zap_alerts:
                 risk = a.get("risk", "Info")
                 alert_name = a.get("alert", "N/A")
