@@ -36,6 +36,8 @@
             margin: 10px 0;
             border: none;
             border-radius: 6px;
+            font-weight: 700;
+            font-size: 15px;
         }
 
         input[type="submit"] {
@@ -46,7 +48,8 @@
             border-radius: 6px;
             background-color: #ff9800;
             color: #fff;
-            font-size: 16px;
+            font-size: 18px;
+            font-weight: 800;
             cursor: pointer;
             transition: background 0.3s;
         }
@@ -60,6 +63,8 @@
             display: block;
             color: #fff;
             text-decoration: none;
+            font-weight: 700;
+            font-size: 15px;
         }
 
         .error {
@@ -73,7 +78,7 @@
 <body>
     <div class="login-container">
         <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-bottom: 2rem;">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="VigiScan Logo" style="max-width: 250px; height: auto;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="VigiScan Logo" style="max-width: 320px; width: 100%; height: auto; transform: scale(1.15); filter: contrast(1.2) drop-shadow(0 4px 8px rgba(0,0,0,0.4));">
         </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
