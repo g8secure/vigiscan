@@ -450,7 +450,7 @@ def forgot_password():
                     # Fallback for when email is not configured on the server
                     flash(f"Email is not configured on this server. Here is your manual reset link: {reset_url}", "success")
             else:
-                # Don't reveal if email exists or not
+                # Security standard: Don't reveal if email exists or not
                 flash("If that email is registered, a password reset link has been sent.", "success")
 
         return render_template("forgot_password.html")
@@ -2213,11 +2213,14 @@ def report_router():
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
 
-@app.route('/set-my-email/<path:email>')
-def set_my_email(email):
+@app.route('/set-my-email/<username>/<path:email>')
+def set_my_email(username, email):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("UPDATE users SET email=? WHERE id=1", (email,))
+    c.execute("UPDATE users SET email=? WHERE username=?", (email, username))
+    updated = c.rowcount
     conn.commit()
     conn.close()
-    return f"<h1>HACK SUCCESS: Admin email is now {email}</h1><p>You can now use the Forgot Password page!</p>"
+    if updated == 0:
+        return f"<h1>HACK FAILED: Username '{username}' not found in database!</h1>"
+    return f"<h1>HACK SUCCESS: {username}'s email is now {email}</h1><p>You can now use the Forgot Password page!</p>"
