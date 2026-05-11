@@ -1,5 +1,0 @@
-Host: 127.0.0.1
-Port 135: open
-Port 137: filtered
-Port 445: open
-Port 623: open

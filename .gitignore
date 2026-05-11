@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.db
+*.db-journal
+instance/
+.env
+.idea/
+*.pdf
+*.xlsx
+*.csv
+reports/
+juice-shop/
