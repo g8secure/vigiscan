@@ -1955,83 +1955,88 @@ def report_router():
 
     # ================= PDF (ENTERPRISE UPGRADE) =================
     if report_type == "pdf":
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
+        try:
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
 
-        # Headers & Branding
-        pdf.set_fill_color(15, 23, 42)
-        pdf.rect(0, 0, 210, 40, 'F')
-        pdf.set_font("Arial", "B", 24)
-        pdf.set_text_color(56, 189, 248) # accent-primary
-        pdf.text(10, 25, "VigiScan Vulnerability report")
-        
-        pdf.set_font("Arial", "", 10)
-        pdf.set_text_color(255, 255, 255)
-        pdf.text(10, 32, sanitize_for_pdf(f"Target: {target} | Generated on: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"))
-        
-        pdf.ln(45)
+            # Headers & Branding
+            pdf.set_fill_color(15, 23, 42)
+            pdf.rect(0, 0, 210, 40, 'F')
+            pdf.set_font("Arial", "B", 24)
+            pdf.set_text_color(56, 189, 248) # accent-primary
+            pdf.text(10, 25, "VigiScan Vulnerability report")
+            
+            pdf.set_font("Arial", "", 10)
+            pdf.set_text_color(255, 255, 255)
+            pdf.text(10, 32, sanitize_for_pdf(f"Target: {target} | Generated on: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"))
+            
+            pdf.ln(45)
 
-        # 1. Executive Summary
-        pdf.set_font("Arial", "B", 16)
-        pdf.set_text_color(15, 23, 42)
-        pdf.cell(0, 10, "1. Executive Summary", ln=True)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(5)
-        
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 7, sanitize_for_pdf(f"This professional security assessment was performed against {target}. The analysis identifies vulnerabilities across multiple categories, including OWASP Top 10 mapping and risk-based prioritization."))
-        
-        pdf.ln(5)
-        # Summary Stats
-        total = len(alerts)
-        high = len([a for a in alerts if a.get("risk") == "High"])
-        med = len([a for a in alerts if a.get("risk") == "Medium"])
-        
-        # DRAW SIMPLE BAR CHART
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(40, 10, f"Critical/High Alerts: {high}")
-        pdf.set_fill_color(231, 76, 60)
-        pdf.rect(50, pdf.get_y() + 2, max(2, high * 5), 6, 'F')
-        pdf.ln(8)
-        
-        pdf.cell(40, 10, f"Medium Alerts: {med}")
-        pdf.set_fill_color(243, 156, 18)
-        pdf.rect(50, pdf.get_y() + 2, max(2, med * 5), 6, 'F')
-        pdf.ln(10)
+            # 1. Executive Summary
+            pdf.set_font("Arial", "B", 16)
+            pdf.set_text_color(15, 23, 42)
+            pdf.cell(0, 10, "1. Executive Summary", ln=True)
+            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+            pdf.ln(5)
+            
+            pdf.set_font("Arial", "", 11)
+            pdf.multi_cell(0, 7, sanitize_for_pdf(f"This professional security assessment was performed against {target}. The analysis identifies vulnerabilities across multiple categories, including OWASP Top 10 mapping and risk-based prioritization."))
+            
+            pdf.ln(5)
+            # Summary Stats
+            total = len(alerts)
+            high = len([a for a in alerts if a.get("risk") == "High"])
+            med = len([a for a in alerts if a.get("risk") == "Medium"])
+            
+            # DRAW SIMPLE BAR CHART
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(40, 10, f"Critical/High Alerts: {high}")
+            pdf.set_fill_color(231, 76, 60)
+            pdf.rect(50, pdf.get_y() + 2, max(2, high * 5), 6, 'F')
+            pdf.ln(8)
+            
+            pdf.cell(40, 10, f"Medium Alerts: {med}")
+            pdf.set_fill_color(243, 156, 18)
+            pdf.rect(50, pdf.get_y() + 2, max(2, med * 5), 6, 'F')
+            pdf.ln(10)
 
-        # 2. Technical Findings
-        pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, "2. Technical Findings & OWASP Mapping", ln=True)
-        pdf.ln(5)
-
-        for i, a in enumerate(alerts, start=1):
-            if pdf.get_y() > 250: pdf.add_page()
-            
-            risk = a.get("risk", "Info")
-            alert_name = sanitize_for_pdf(a.get("alert", ""))
-            owasp_cat = sanitize_for_pdf(map_to_owasp(a.get("alert", "")))
-            
-            pdf.set_font("Arial", "B", 11)
-            pdf.set_fill_color(241, 245, 249)
-            pdf.cell(0, 8, f" {i}. {alert_name} [{risk}]", ln=True, fill=True)
-            
-            pdf.set_font("Arial", "I", 9)
-            pdf.set_text_color(100, 100, 100)
-            pdf.cell(0, 6, f"   OWASP Category: {owasp_cat}", ln=True)
-            
-            pdf.set_font("Arial", "", 9)
-            pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Description: {a.get('description', 'N/A')}"))
-            pdf.set_font("Arial", "B", 9)
-            pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Remediation: {a.get('solution', 'N/A')}"))
+            # 2. Technical Findings
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(0, 10, "2. Technical Findings & OWASP Mapping", ln=True)
             pdf.ln(5)
 
-        pdf_bytes = pdf.output()
-        response = make_response(bytes(pdf_bytes))
-        response.headers["Content-Type"] = "application/pdf"
-        response.headers["Content-Disposition"] = f"attachment; filename=VigiScan_{target}_Report.pdf"
-        return response
+            for i, a in enumerate(alerts, start=1):
+                if pdf.get_y() > 250: pdf.add_page()
+                
+                risk = a.get("risk", "Info")
+                alert_name = sanitize_for_pdf(a.get("alert", ""))
+                owasp_cat = sanitize_for_pdf(map_to_owasp(a.get("alert", "")))
+                
+                pdf.set_font("Arial", "B", 11)
+                pdf.set_fill_color(241, 245, 249)
+                pdf.cell(0, 8, f" {i}. {alert_name} [{risk}]", ln=True, fill=True)
+                
+                pdf.set_font("Arial", "I", 9)
+                pdf.set_text_color(100, 100, 100)
+                pdf.cell(0, 6, f"   OWASP Category: {owasp_cat}", ln=True)
+                
+                pdf.set_font("Arial", "", 9)
+                pdf.set_text_color(0, 0, 0)
+                pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Description: {a.get('description', 'N/A')}"))
+                pdf.set_font("Arial", "B", 9)
+                pdf.multi_cell(0, 5, sanitize_for_pdf(f"   Remediation: {a.get('solution', 'N/A')}"))
+                pdf.ln(5)
+
+            pdf_bytes = pdf.output()
+            response = make_response(bytes(pdf_bytes))
+            response.headers["Content-Type"] = "application/pdf"
+            response.headers["Content-Disposition"] = f"attachment; filename=VigiScan_{target}_Report.pdf"
+            return response
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            return f"PDF Generation Error: {str(e)}<br><pre>{error_trace}</pre>", 500
 
     # ================= EXCEL EXPORT (ADDED) =================
     elif report_type == "excel":
