@@ -47,6 +47,25 @@ app.config['MAIL_DEFAULT_SENDER'] = _MAIL_USER
 
 mail = Mail(app)
 
+@app.context_processor
+def inject_user_language():
+    user_lang = "en"
+    if session.get("user"):
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT settings FROM users WHERE username=?", (session.get("user"),))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0]:
+            try:
+                settings_data = json.loads(row[0])
+                user_lang = settings_data.get("language", "en")
+            except:
+                user_lang = "en"
+
+    lang_strings = LANGUAGES.get(user_lang, LANGUAGES.get("en", {}))
+    return {"user_lang": user_lang, "lang_strings": lang_strings}
+
 SCAN_LOCK = Lock()
 SCAN_JOBS = {}
 
@@ -541,6 +560,66 @@ def dashboard():
 
     return render_template("dashboard.html", user=session.get("user", "Guest"), user_lang=user_lang)
 
+@app.route('/assets')
+@login_required
+def assets():
+    return render_template("assets.html", user=session.get("user"))
+
+@app.route('/assets/<int:asset_id>')
+@login_required
+def asset_detail(asset_id):
+    return render_template("asset_detail.html", user=session.get("user"), asset_id=asset_id)
+
+@app.route('/scans')
+@login_required
+def scans():
+    return render_template("scans.html", user=session.get("user"))
+
+@app.route('/scans/new')
+@login_required
+def scan_new():
+    return render_template("scan_new.html", user=session.get("user"))
+
+@app.route('/scans/authenticated')
+@login_required
+def scan_authenticated():
+    return render_template("scan_authenticated.html", user=session.get("user"))
+
+@app.route('/scans/<scan_id>')
+@login_required
+def scan_detail(scan_id):
+    return render_template("scan_detail.html", user=session.get("user"), scan_id=scan_id)
+
+@app.route('/vulnerabilities')
+@login_required
+def vulnerabilities():
+    return render_template("vulnerabilities.html", user=session.get("user"))
+
+@app.route('/vulnerabilities/<int:vuln_id>')
+@login_required
+def vulnerability_detail(vuln_id):
+    return render_template("vulnerability_detail.html", user=session.get("user"), vuln_id=vuln_id)
+
+@app.route('/reports')
+@login_required
+def reports():
+    return render_template("reports.html", user=session.get("user"))
+
+@app.route('/schedules')
+@login_required
+def schedules():
+    return render_template("schedules.html", user=session.get("user"))
+
+@app.route('/risk')
+@login_required
+def risk():
+    return render_template("risk.html", user=session.get("user"))
+
+@app.route('/knowledge-base')
+@login_required
+def knowledge_base():
+    return render_template("knowledge_base.html", user=session.get("user"))
+
 @app.route('/api/save_language', methods=['POST'])
 @login_required
 def save_language():
@@ -748,16 +827,89 @@ def remove_admin(user_id):
 def get_assets():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT id, name, ip, domain, environment, criticality, is_internet_facing FROM assets")
+    c.execute("SELECT id, name, ip, domain, owner, environment, criticality, is_internet_facing FROM assets")
     rows = c.fetchall()
     conn.close()
     return jsonify([
         {
             "id": r[0], "name": r[1], "target": r[2] or r[3],
-            "environment": r[4], "criticality": r[5], "internet_facing": bool(r[6])
+            "owner": r[4], "environment": r[5], "criticality": r[6], "internet_facing": bool(r[7])
         }
         for r in rows
     ])
+
+@app.route('/api/assets/<int:asset_id>')
+@login_required
+def get_asset(asset_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, name, ip, domain, owner, environment, criticality, is_internet_facing FROM assets WHERE id=?", (asset_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Asset not found"}), 404
+    return jsonify({
+        "id": row[0],
+        "name": row[1],
+        "target": row[2] or row[3],
+        "owner": row[4], "environment": row[5],
+        "criticality": row[6], "internet_facing": bool(row[7])
+    })
+
+@app.route('/api/assets/<int:asset_id>', methods=['PUT'])
+@login_required
+def update_asset(asset_id):
+    data = request.json or {}
+    name = data.get('name')
+    target = data.get('target')
+    env = data.get('environment')
+    criticality = data.get('criticality')
+    internet = 1 if data.get('internet') else 0
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT owner FROM assets WHERE id=?", (asset_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Asset not found"}), 404
+
+    owner = row[0]
+    if owner != session.get('user') and not session.get('is_admin'):
+        conn.close()
+        return jsonify({"error": "Permission denied"}), 403
+
+    ip = target if re.match(r'^\d{1,3}(\.\d{1,3}){3}$', target) else None
+    domain = target if not ip else None
+    c.execute("UPDATE assets SET name=?, ip=?, domain=?, environment=?, criticality=?, is_internet_facing=? WHERE id=?",
+              (name, ip, domain, env, criticality, internet, asset_id))
+    conn.commit()
+    conn.close()
+
+    log_activity(session.get('user'), 'UPDATE_ASSET', f'Updated asset {asset_id} ({name})')
+    return jsonify({"message": "Asset updated"})
+
+@app.route('/api/assets/<int:asset_id>', methods=['DELETE'])
+@login_required
+def delete_asset_by_id(asset_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT owner FROM assets WHERE id=?", (asset_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Asset not found"}), 404
+
+    owner = row[0]
+    if owner != session.get('user') and not session.get('is_admin'):
+        conn.close()
+        return jsonify({"error": "Permission denied"}), 403
+
+    c.execute("DELETE FROM assets WHERE id=?", (asset_id,))
+    conn.commit()
+    conn.close()
+    log_activity(session.get('user'), 'DELETE_ASSET', f'Deleted asset {asset_id}')
+    return jsonify({"message": "Asset deleted"})
 
 @app.route('/api/admin/add_asset', methods=['POST'])
 @login_required
@@ -788,7 +940,7 @@ def get_all_vulnerabilities():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        SELECT v.id, v.name, v.severity, v.risk_score, v.status, v.date_found, a.name, v.scan_id
+        SELECT v.id, v.name, v.severity, v.risk_score, v.status, v.date_found, a.name, v.scan_id, v.asset_id
         FROM vulnerabilities v
         LEFT JOIN assets a ON v.asset_id = a.id
         ORDER BY v.risk_score DESC
@@ -798,7 +950,7 @@ def get_all_vulnerabilities():
     return jsonify([
         {
             "id": r[0], "alert": r[1], "risk": r[2], "risk_score": r[3],
-            "status": r[4], "date_found": r[5], "asset_name": r[6], "scan_id": r[7],
+            "status": r[4], "date_found": r[5], "asset_name": r[6], "scan_id": r[7], "asset_id": r[8],
             "description": "Lifecycle tracked vulnerability.", "solution": "See scan reports for details."
         }
         for r in rows
@@ -843,11 +995,900 @@ def get_remediation(alert_name):
 
 # ================= I18N SUPPORT =================
 LANGUAGES = {
-    "en": {"dashboard": "Dashboard", "start_scan": "Start Scan", "history": "History", "alerts": "Alerts", "assets": "Asset Inventory"},
-    "uk_en": {"dashboard": "Dashboard", "start_scan": "Commence Scan", "history": "Past Assessments", "alerts": "Vulnerabilities", "assets": "Asset Register"},
-    "es": {"dashboard": "Panel de Control", "start_scan": "Iniciar Escaneo", "history": "Historial", "alerts": "Alertas"},
-    "fr": {"dashboard": "Tableau de Bord", "start_scan": "Lancer le Scan", "history": "Historique", "alerts": "Alertes"},
-    "zh-CN": {"dashboard": "仪表板", "start_scan": "开始扫描", "history": "历史记录", "alerts": "警报"}
+    "en": {
+        "dashboard": "Dashboard",
+        "start_scan": "Start Scan",
+        "history": "History",
+        "alerts": "Alerts",
+        "assets": "Asset Inventory",
+        "reports": "Reports",
+        "schedules": "Schedules",
+        "risk": "Risk",
+        "knowledge": "Knowledge Base",
+        "administration": "Administration",
+        "settings": "Settings",
+        "logout": "Logout",
+        "profile": "Profile",
+        "new_scan": "+ NEW SCAN",
+        "help": "?",
+        "security_overview_title": "Security Operations Overview",
+        "security_overview_description": "Monitor scan activity, asset status, and vulnerability trends in one place.",
+        "launch_scan": "Launch Scan",
+        "recent_scan_history": "Recent Scan History",
+        "notifications": "Notifications",
+        "trend_summary": "Trend Summary",
+        "loading_latest_scans": "Loading latest scans...",
+        "no_recent_scans": "No recent scans available.",
+        "no_notifications": "No notifications yet.",
+        "unable_load_history": "Unable to load scan history.",
+            "loading_scan_history": "Loading scan history...",
+        "unable_load_notifications": "Unable to load notifications.",
+        "unable_load_trends": "Unable to load trends.",
+        "history_page_heading": "Scan History",
+        "history_page_description": "Review completed and scheduled scan activity across your account.",
+        "back_to_dashboard": "Back to Dashboard",
+        "scan_id": "Scan ID",
+        "target": "Target",
+        "date": "Date",
+        "status": "Status",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "loading_history": "Loading scan history...",
+        "no_scan_history": "No scan history available.",
+        "profile_label": "Profile",
+        "logged_in_as": "Logged in as:",
+        "twofa_status": "Two-Factor Status:",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "new_password": "New Password",
+        "preferred_language": "Preferred Language",
+        "enable_mfa": "Enable Multi-Factor Authentication (MFA)",
+        "apply_configuration": "Apply Configuration",
+        "settings_updated": "Settings updated successfully!",
+        "id_label": "ID",
+        "name_label": "Name",
+        "asset_id_label": "Asset ID",
+        "vulnerability_id_label": "Vulnerability ID",
+            "scan_id_label": "Scan ID",
+        "risk_score_label": "Risk Score",
+        "alert_label": "Alert",
+            "severity_label": "Severity",
+        "count_label": "Count",
+        "related_vulnerabilities": "Related Vulnerabilities",
+        "loading_related_vulnerabilities": "Loading related vulnerabilities...",
+        "no_related_vulnerabilities": "No related vulnerabilities found.",
+        "unable_load_asset_details": "Unable to load asset details.",
+        "back_to_assets": "Back to Assets",
+        "save_asset": "Save Asset",
+        "save_changes": "Save Changes",
+        "edit_asset": "Edit Asset",
+        "delete_asset": "Delete Asset",
+        "delete_asset_confirm": "Delete this asset? This cannot be undone.",
+        "unable_delete_asset": "Unable to delete asset.",
+            "unable_update_asset": "Unable to update asset.",
+        "could_not_save_asset": "Unable to save asset.",
+        "asset_name": "Asset Name",
+            "asset": "Asset",
+        "target_address": "Target Address",
+        "environment": "Environment",
+        "criticality": "Criticality",
+        "internet_facing": "Internet Facing",
+            "add_asset_title": "Add New Asset",
+            "add_asset_description": "Create a new asset record to include it in scan inventories.",
+            "asset_details_description": "Review the asset profile, risk context, and associated scan findings.",
+            "asset_name_placeholder": "Database server",
+            "target_address_placeholder": "192.168.1.10 or app.example.com",
+            "environment_placeholder": "Production, Staging, DMZ",
+            "low_label": "Low",
+            "high_label": "High",
+            "critical_label": "Critical",
+            "yes_label": "Yes",
+            "no_label": "No",
+        "loading_remediation_details": "Loading remediation details...",
+        "remediation_guidance": "Remediation Guidance",
+        "vulnerability_detail_description": "Review vulnerability context, asset association, and remediation guidance.",
+            "vulnerability_detail_title": "Vulnerability Details",
+        "back_to_vulnerabilities": "Back to Vulnerabilities",
+        "vulnerability_not_found": "Vulnerability not found.",
+        "unable_load_vulnerability_details": "Unable to load vulnerability details.",
+        "refer_scan_report": "Refer to the scan report for remediation details.",
+        "review_vendor_guidance": "Review vendor guidance and apply secure configuration changes.",
+        "scan_details_title": "Scan Details",
+        "scan_details_description": "Detailed view of scan results, alerts, and remediation status.",
+        "back_to_scans": "Back to Scans",
+        "alert_breakdown": "Alert Breakdown",
+        "loading_alert_breakdown": "Loading alert breakdown...",
+        "scan_record_not_found": "Scan record not found.",
+        "unable_load_scan_details": "Unable to load scan details.",
+        "scheduled_scans_title": "Scheduled Scans",
+        "scheduled_scans_description": "Manage recurring and one-time scan jobs for your environment.",
+        "create_schedule": "Create Schedule",
+        "schedule_id": "Schedule ID",
+        "next_run": "Next Run",
+        "no_schedules_configured": "No schedules configured.",
+        "unable_load_schedules": "Unable to load schedules.",
+            "loading_schedules": "Loading schedules...",
+        "active_status": "Active",
+        "paused_status": "Paused",
+        "scan_management_title": "Scan Management",
+            "scans_title": "Scans",
+            "alerts_label": "Alerts",
+            "medium_label": "Medium",
+            "unable_load_scan_history": "Unable to load scan history.",
+        "review_active_jobs": "Review active jobs and historical scan results.",
+        "no_scan_records_found": "No scan records found.",
+        "delete_user_confirm": "Are you sure you want to delete this user?",
+        "delete_button": "Delete",
+        "make_admin_button": "Make Admin",
+        "remove_admin_button": "Remove Admin",
+        "user_role": "Role",
+            "username_label": "Username",
+        "actions_label": "Actions",
+        "admin_panel_title": "Admin Panel",
+        "admin_panel_description": "Manage users, roles, and privileged administration tasks from a centralized view.",
+        "open_vulns": "Open Vulnerabilities",
+        "active_jobs": "Active Jobs",
+        "loading_notifications": "Loading notifications...",
+        "no_next_run": "No next run",
+        "settings_description": "Update your password and manage account security settings including 2FA.",
+        "total_assets": "Total Assets",
+        "total_scans": "Total Scans",
+        "unknown": "Unknown"
+    },
+    "uk_en": {
+        "dashboard": "Dashboard",
+        "start_scan": "Commence Scan",
+        "history": "Past Assessments",
+        "alerts": "Vulnerabilities",
+        "assets": "Asset Register",
+        "reports": "Reports",
+        "schedules": "Schedules",
+        "risk": "Risk",
+        "knowledge": "Knowledge Base",
+        "administration": "Administration",
+        "settings": "Settings",
+        "logout": "Logout",
+        "profile": "Profile",
+        "new_scan": "+ NEW SCAN",
+        "help": "?",
+        "topbar_subtitle": "Vulnerability management platform",
+        "asset_inventory_title": "Asset Register",
+        "asset_inventory_description": "Track assets, hosting, and criticality across your environment.",
+        "add_new_asset": "Add New Asset",
+        "loading_assets": "Loading assets...",
+        "no_assets_found": "No assets found.",
+        "unable_load_assets": "Unable to load assets.",
+        "report_center_title": "Report Center",
+        "report_center_description": "Generate exportable PDF, HTML, Excel, and CSV reports from recent scan results.",
+        "open_scan_history": "Open Scan History",
+        "export_type": "Export Type",
+        "latest_scan": "Latest Scan",
+        "action": "Action",
+        "loading_reports": "Loading reports...",
+        "no_completed_scan_reports": "No completed scan reports available.",
+        "download_pdf": "Download PDF",
+        "download_html": "Download HTML",
+        "download_excel": "Download Excel",
+        "unable_load_report_summaries": "Unable to load report summaries.",
+        "knowledge_base_title": "Knowledge Base",
+        "knowledge_base_description": "Browse security guidance, CVE context, MITRE mappings, and remediation best practices.",
+        "export_guidance": "Export Guidance",
+        "loading_knowledge_base": "Loading knowledge base...",
+        "no_knowledge_base_articles": "No knowledge base articles available.",
+        "unable_load_articles": "Unable to load articles.",
+        "system": "System",
+        "risk_management_title": "Risk Management",
+        "risk_analysis": "Risk Analysis",
+        "risk_description": "Monitor risk scores and vulnerability exposure across your environment.",
+        "risk_description": "Monitor risk scores and vulnerability exposure across your environment.",
+        "high_risk": "High Risk",
+        "medium_risk": "Medium Risk",
+        "low_risk": "Low Risk",
+        "total_open": "Total Open",
+        "review_reports": "Review Reports",
+        "risk_trend": "Risk Trend",
+        "unable_load_risk_trend": "Unable to load risk trend data.",
+        "vulnerabilities_title": "Vulnerability Management",
+        "vulnerabilities_description": "Review vulnerability details, status, and asset associations.",
+        "view_reports": "View Reports",
+        "loading_vulnerabilities": "Loading vulnerabilities...",
+        "no_vulnerabilities_found": "No vulnerabilities found.",
+        "unable_load_vulnerabilities": "Unable to load vulnerabilities.",
+        "unassigned": "Unassigned",
+        "yes": "Yes",
+        "no": "No",
+        "unknown": "Unknown",
+        "security_overview_title": "Security Operations Overview",
+        "security_overview_description": "Monitor scan activity, asset status, and vulnerability trends in one place.",
+        "launch_scan": "Launch Scan",
+        "recent_scan_history": "Recent Scan History",
+        "notifications": "Notifications",
+        "trend_summary": "Trend Summary",
+        "loading_latest_scans": "Loading latest scans...",
+        "no_recent_scans": "No recent scans available.",
+        "no_notifications": "No notifications yet.",
+        "unable_load_history": "Unable to load scan history.",
+            "loading_scan_history": "Unable to load scan history.",
+        "unable_load_notifications": "Unable to load notifications.",
+        "unable_load_trends": "Unable to load trends.",
+        "history_page_heading": "Scan History",
+        "history_page_description": "Review completed and scheduled scan activity across your account.",
+        "back_to_dashboard": "Back to Dashboard",
+        "scan_id": "Scan ID",
+        "target": "Target",
+        "date": "Date",
+        "status": "Status",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "loading_history": "Loading scan history...",
+        "no_scan_history": "No scan history available.",
+        "profile_label": "Profile",
+        "logged_in_as": "Logged in as:",
+        "twofa_status": "Two-Factor Status:",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "new_password": "New Password",
+        "preferred_language": "Preferred Language",
+        "enable_mfa": "Enable Multi-Factor Authentication (MFA)",
+        "apply_configuration": "Apply Configuration",
+        "settings_updated": "Settings updated successfully!",
+        "id_label": "ID",
+        "name_label": "Name",
+        "asset_id_label": "Asset ID",
+        "vulnerability_id_label": "Vulnerability ID",
+            "scan_id_label": "Scan ID",
+        "risk_score_label": "Risk Score",
+        "alert_label": "Alert",
+            "severity_label": "Severity",
+        "count_label": "Count",
+        "related_vulnerabilities": "Related Vulnerabilities",
+        "loading_related_vulnerabilities": "Loading related vulnerabilities...",
+        "no_related_vulnerabilities": "No related vulnerabilities found.",
+        "unable_load_asset_details": "Unable to load asset details.",
+        "back_to_assets": "Back to Assets",
+        "save_asset": "Save Asset",
+        "save_changes": "Save Changes",
+        "edit_asset": "Edit Asset",
+        "delete_asset": "Delete Asset",
+        "delete_asset_confirm": "Delete this asset? This cannot be undone.",
+        "unable_delete_asset": "Unable to delete asset.",
+            "unable_update_asset": "Unable to update asset.",
+        "could_not_save_asset": "Unable to save asset.",
+        "asset_name": "Asset Name",
+            "asset": "Asset",
+        "target_address": "Target Address",
+        "environment": "Environment",
+        "criticality": "Criticality",
+        "internet_facing": "Internet Facing",
+            "add_asset_title": "Add New Asset",
+            "add_asset_description": "Create a new asset record to include it in scan inventories.",
+            "asset_details_description": "Review the asset profile, risk context, and associated scan findings.",
+            "asset_name_placeholder": "Database server",
+            "target_address_placeholder": "192.168.1.10 or app.example.com",
+            "environment_placeholder": "Production, Staging, DMZ",
+            "low_label": "Low",
+            "high_label": "High",
+            "critical_label": "Critical",
+            "yes_label": "Yes",
+            "no_label": "No",
+        "loading_remediation_details": "Loading remediation details...",
+        "remediation_guidance": "Remediation Guidance",
+        "vulnerability_detail_description": "Review vulnerability context, asset association, and remediation guidance.",
+            "vulnerability_detail_title": "Vulnerability Details",
+        "back_to_vulnerabilities": "Back to Vulnerabilities",
+        "vulnerability_not_found": "Vulnerability not found.",
+        "unable_load_vulnerability_details": "Unable to load vulnerability details.",
+        "refer_scan_report": "Refer to the scan report for remediation details.",
+        "review_vendor_guidance": "Review vendor guidance and apply secure configuration changes.",
+        "scan_details_title": "Scan Details",
+        "scan_details_description": "Detailed view of scan results, alerts, and remediation status.",
+        "back_to_scans": "Back to Scans",
+        "alert_breakdown": "Alert Breakdown",
+        "loading_alert_breakdown": "Loading alert breakdown...",
+        "scan_record_not_found": "Scan record not found.",
+        "unable_load_scan_details": "Unable to load scan details.",
+        "scheduled_scans_title": "Scheduled Scans",
+        "scheduled_scans_description": "Manage recurring and one-time scan jobs for your environment.",
+        "create_schedule": "Create Schedule",
+        "schedule_id": "Schedule ID",
+        "next_run": "Next Run",
+        "no_schedules_configured": "No schedules configured.",
+        "unable_load_schedules": "Unable to load schedules.",
+            "loading_schedules": "Unable to load schedules.",
+        "active_status": "Active",
+        "paused_status": "Paused",
+        "scan_management_title": "Scan Management",
+            "scans_title": "Scans",
+            "alerts_label": "Alerts",
+            "medium_label": "Medium",
+            "unable_load_scan_history": "Unable to load scan history.",
+        "review_active_jobs": "Review active jobs and historical scan results.",
+        "no_scan_records_found": "No scan records found.",
+        "delete_user_confirm": "Are you sure you want to delete this user?",
+        "delete_button": "Delete",
+        "make_admin_button": "Make Admin",
+        "remove_admin_button": "Remove Admin",
+        "user_role": "Role",
+            "username_label": "Username",
+        "actions_label": "Actions",
+        "admin_panel_title": "Admin Panel",
+        "admin_panel_description": "Manage users, roles, and privileged administration tasks from a centralized view.",
+        "open_vulns": "Open Vulnerabilities",
+        "active_jobs": "Active Jobs",
+        "loading_notifications": "Loading notifications...",
+        "no_next_run": "No next run",
+        "settings_description": "Update your password and manage account security settings including 2FA.",
+        "total_assets": "Total Assets",
+        "total_scans": "Total Scans",
+        "unknown": "Unknown"
+    },
+    "es": {
+        "dashboard": "Panel de Control",
+        "start_scan": "Iniciar Escaneo",
+        "history": "Historial",
+        "alerts": "Alertas",
+        "assets": "Inventario",
+        "reports": "Informes",
+        "schedules": "Programaciones",
+        "risk": "Riesgo",
+        "knowledge": "Base de Conocimiento",
+        "administration": "Administración",
+        "settings": "Ajustes",
+        "logout": "Cerrar sesión",
+        "profile": "Perfil",
+        "new_scan": "+ NUEVO ESCANEO",
+        "help": "?",
+        "topbar_subtitle": "Plataforma de gestión de vulnerabilidades",
+        "asset_inventory_title": "Inventario",
+        "asset_inventory_description": "Realice un seguimiento de los activos, el alojamiento y la criticidad en su entorno.",
+        "add_new_asset": "Agregar nuevo activo",
+        "loading_assets": "Cargando activos...",
+        "no_assets_found": "No se encontraron activos.",
+        "unable_load_assets": "No se pueden cargar los activos.",
+        "report_center_title": "Centro de Informes",
+        "report_center_description": "Genere informes exportables en PDF, HTML, Excel y CSV a partir de resultados de escaneos recientes.",
+        "open_scan_history": "Abrir historial de escaneos",
+        "export_type": "Tipo de exportación",
+        "latest_scan": "Escaneo más reciente",
+        "action": "Acción",
+        "loading_reports": "Cargando informes...",
+        "no_completed_scan_reports": "No hay informes de escaneos completados disponibles.",
+        "download_pdf": "Descargar PDF",
+        "download_html": "Descargar HTML",
+        "download_excel": "Descargar Excel",
+        "unable_load_report_summaries": "No se pueden cargar los resúmenes de informes.",
+        "knowledge_base_title": "Base de Conocimiento",
+        "knowledge_base_description": "Busque orientación de seguridad, contexto CVE, asignaciones MITRE y mejores prácticas de remediación.",
+        "export_guidance": "Exportar orientación",
+        "loading_knowledge_base": "Cargando base de conocimientos...",
+        "no_knowledge_base_articles": "No hay artículos de la base de conocimientos disponibles.",
+        "unable_load_articles": "No se pueden cargar los artículos.",
+        "system": "Sistema",
+        "risk_management_title": "Gestión de Riesgos",
+        "risk_analysis": "Análisis de Riesgos",
+        "risk_description": "Supervise las puntuaciones de riesgo y la exposición de vulnerabilidades en su entorno.",
+        "high_risk": "Alto Riesgo",
+        "medium_risk": "Riesgo Medio",
+        "low_risk": "Bajo Riesgo",
+        "total_open": "Abierto Total",
+        "review_reports": "Revisar Informes",
+        "risk_trend": "Tendencia de Riesgo",
+        "unable_load_risk_trend": "No se puede cargar la tendencia de riesgo.",
+        "vulnerabilities_title": "Gestión de Vulnerabilidades",
+        "vulnerabilities_description": "Revise los detalles de vulnerabilidades, el estado y las asociaciones de activos.",
+        "view_reports": "Ver Informes",
+        "loading_vulnerabilities": "Cargando vulnerabilidades...",
+        "no_vulnerabilities_found": "No se encontraron vulnerabilidades.",
+        "unable_load_vulnerabilities": "No se pueden cargar las vulnerabilidades.",
+        "unassigned": "No asignado",
+        "yes": "Sí",
+        "no": "No",
+        "unknown": "Desconocido",
+        "security_overview_title": "Resumen de Operaciones de Seguridad",
+        "security_overview_description": "Supervisa la actividad de los escaneos, el estado de los activos y las tendencias de vulnerabilidades en un solo lugar.",
+        "launch_scan": "Iniciar Escaneo",
+        "recent_scan_history": "Historial Reciente de Escaneos",
+        "notifications": "Notificaciones",
+        "trend_summary": "Resumen de Tendencias",
+        "loading_latest_scans": "Cargando últimos escaneos...",
+        "no_recent_scans": "No hay escaneos recientes disponibles.",
+        "no_notifications": "Aún no hay notificaciones.",
+        "unable_load_history": "No se puede cargar el historial de escaneos.",
+            "loading_scan_history": "No se puede cargar el historial de escaneos.",
+        "unable_load_notifications": "No se pueden cargar las notificaciones.",
+        "unable_load_trends": "No se pueden cargar las tendencias.",
+        "history_page_heading": "Historial de Escaneos",
+        "history_page_description": "Revise la actividad de escaneos completados y programados en su cuenta.",
+        "back_to_dashboard": "Volver al Panel",
+        "scan_id": "ID de Escaneo",
+        "target": "Objetivo",
+        "date": "Fecha",
+        "status": "Estado",
+        "high": "Alto",
+        "medium": "Medio",
+        "low": "Bajo",
+        "loading_history": "Cargando historial de escaneos...",
+        "no_scan_history": "No hay historial de escaneos disponible.",
+        "profile_label": "Perfil",
+        "logged_in_as": "Conectado como:",
+        "twofa_status": "Estado de 2FA:",
+        "enabled": "Habilitado",
+        "disabled": "Deshabilitado",
+        "new_password": "Nueva Contraseña",
+        "preferred_language": "Idioma Preferido",
+        "enable_mfa": "Habilitar Autenticación Multifactor (MFA)",
+        "apply_configuration": "Aplicar Configuración",
+        "settings_updated": "¡Configuración actualizada correctamente!",
+        "id_label": "ID",
+        "name_label": "Nombre",
+        "asset_id_label": "ID de Activo",
+        "vulnerability_id_label": "ID de Vulnerabilidad",
+            "scan_id_label": "ID de escaneo",
+        "risk_score_label": "Puntuación de Riesgo",
+        "alert_label": "Alerta",
+            "severity_label": "Severidad",
+        "count_label": "Cantidad",
+        "related_vulnerabilities": "Vulnerabilidades Relacionadas",
+        "loading_related_vulnerabilities": "Cargando vulnerabilidades relacionadas...",
+        "no_related_vulnerabilities": "No se encontraron vulnerabilidades relacionadas.",
+        "unable_load_asset_details": "No se pueden cargar los detalles del activo.",
+        "back_to_assets": "Volver a Activos",
+        "save_asset": "Guardar Activo",
+        "save_changes": "Guardar Cambios",
+        "edit_asset": "Editar Activo",
+        "delete_asset": "Eliminar Activo",
+        "delete_asset_confirm": "¿Eliminar este activo? Esto no se puede deshacer.",
+        "unable_delete_asset": "No se puede eliminar el activo.",
+            "unable_update_asset": "No se puede actualizar el activo.",
+        "could_not_save_asset": "No se puede guardar el activo.",
+        "asset_name": "Nombre del Activo",
+            "asset": "Activo",
+        "target_address": "Dirección de Destino",
+        "environment": "Entorno",
+        "criticality": "Criticidad",
+        "internet_facing": "Expuesto a Internet",
+        "add_asset_title": "Agregar nuevo activo",
+        "add_asset_description": "Cree un nuevo registro de activo para incluirlo en los inventarios de escaneo.",
+        "asset_details_description": "Revise el perfil del activo, el contexto de riesgo y los hallazgos de escaneo asociados.",
+        "asset_name_placeholder": "Servidor de base de datos",
+        "target_address_placeholder": "192.168.1.10 o app.example.com",
+        "environment_placeholder": "Producción, Staging, DMZ",
+        "low_label": "Bajo",
+        "high_label": "Alto",
+        "critical_label": "Crítico",
+        "yes_label": "Sí",
+        "no_label": "No",
+        "loading_remediation_details": "Cargando detalles de remediación...",
+        "remediation_guidance": "Guía de Remediación",
+        "vulnerability_detail_description": "Revise el contexto de la vulnerabilidad, la asociación de activos y la guía de remediación.",
+            "vulnerability_detail_title": "Detalles de la vulnerabilidad",
+        "back_to_vulnerabilities": "Volver a Vulnerabilidades",
+        "vulnerability_not_found": "Vulnerabilidad no encontrada.",
+        "unable_load_vulnerability_details": "No se pueden cargar los detalles de la vulnerabilidad.",
+        "refer_scan_report": "Consulte el informe de escaneo para obtener detalles de remediación.",
+        "review_vendor_guidance": "Revise la guía del proveedor y aplique cambios de configuración seguros.",
+        "scan_details_title": "Detalles de Escaneo",
+        "scan_details_description": "Vista detallada de los resultados del escaneo, alertas y estado de remediación.",
+        "back_to_scans": "Volver a Escaneos",
+        "alert_breakdown": "Desglose de Alertas",
+        "loading_alert_breakdown": "Cargando desglose de alertas...",
+        "scan_record_not_found": "Registro de escaneo no encontrado.",
+        "unable_load_scan_details": "No se pueden cargar los detalles del escaneo.",
+        "scheduled_scans_title": "Escaneos Programados",
+        "scheduled_scans_description": "Administre trabajos de escaneo recurrentes y únicos para su entorno.",
+        "create_schedule": "Crear Programación",
+        "schedule_id": "ID de Programación",
+        "next_run": "Próxima Ejecución",
+        "no_schedules_configured": "No hay programación configurada.",
+        "unable_load_schedules": "No se pueden cargar las programaciones.",
+            "loading_schedules": "No se pueden cargar las programaciones.",
+        "active_status": "Activo",
+        "paused_status": "Pausado",
+        "scan_management_title": "Gestión de Escaneos",
+        "scans_title": "Escaneos",
+        "alerts_label": "Alertas",
+        "high_label": "Alto",
+        "medium_label": "Medio",
+        "low_label": "Bajo",
+        "unable_load_scan_history": "No se puede cargar el historial de escaneos.",
+        "review_active_jobs": "Revise trabajos activos y resultados históricos de escaneos.",
+        "no_scan_records_found": "No se encontraron registros de escaneo.",
+        "delete_user_confirm": "¿Está seguro de que desea eliminar este usuario?",
+        "delete_button": "Eliminar",
+        "make_admin_button": "Convertir en administrador",
+        "remove_admin_button": "Quitar administrador",
+        "user_role": "Rol",
+            "username_label": "Nom d'utilisateur",
+        "actions_label": "Acciones",
+        "admin_panel_title": "Panel de Administración",
+        "admin_panel_description": "Administre usuarios, roles y tareas administrativas privilegiadas desde una vista centralizada.",
+        "open_vulns": "Vulnerabilidades Abiertas",
+        "active_jobs": "Trabajos Activos",
+        "loading_notifications": "Cargando notificaciones...",
+        "no_next_run": "Sin próxima ejecución",
+        "settings_description": "Actualice su contraseña y administre la seguridad de la cuenta, incluida 2FA.",
+        "total_assets": "Total de Activos",
+        "total_scans": "Total de Escaneos",
+        "unknown": "Desconocido"
+    },
+    "fr": {
+        "dashboard": "Tableau de Bord",
+        "start_scan": "Lancer le Scan",
+        "history": "Historique",
+        "alerts": "Alertes",
+        "assets": "Inventaire",
+        "reports": "Rapports",
+        "schedules": "Programmes",
+        "risk": "Risque",
+        "knowledge": "Base de Connaissances",
+        "administration": "Administration",
+        "settings": "Paramètres",
+        "logout": "Déconnexion",
+        "profile": "Profil",
+        "new_scan": "+ NOUVELLE ANALYSE",
+        "help": "?",
+        "topbar_subtitle": "Plateforme de gestion des vulnérabilités",
+        "asset_inventory_title": "Inventaire",
+        "asset_inventory_description": "Suivez les actifs, l'hébergement et la criticité dans votre environnement.",
+        "add_new_asset": "Ajouter un actif",
+        "loading_assets": "Chargement des actifs...",
+        "no_assets_found": "Aucun actif trouvé.",
+        "unable_load_assets": "Impossible de charger les actifs.",
+        "report_center_title": "Centre de Rapports",
+        "report_center_description": "Générez des rapports exportables PDF, HTML, Excel et CSV à partir des résultats d'analyse récents.",
+        "open_scan_history": "Ouvrir l'historique des analyses",
+        "export_type": "Type d'exportation",
+        "latest_scan": "Analyse la plus récente",
+        "action": "Action",
+        "loading_reports": "Chargement des rapports...",
+        "no_completed_scan_reports": "Aucun rapport d'analyse terminé disponible.",
+        "download_pdf": "Télécharger le PDF",
+        "download_html": "Télécharger le HTML",
+        "download_excel": "Télécharger Excel",
+        "unable_load_report_summaries": "Impossible de charger les résumés de rapports.",
+        "knowledge_base_title": "Base de Connaissances",
+        "knowledge_base_description": "Parcourez les conseils de sécurité, le contexte CVE, les correspondances MITRE et les meilleures pratiques de remédiation.",
+        "export_guidance": "Exporter des conseils",
+        "loading_knowledge_base": "Chargement de la base de connaissances...",
+        "no_knowledge_base_articles": "Aucun article de base de connaissances disponible.",
+        "unable_load_articles": "Impossible de charger les articles.",
+        "system": "Système",
+        "risk_management_title": "Gestion des Risques",
+        "risk_analysis": "Analyse des Risques",
+        "risk_description": "Surveillez les scores de risque et l'exposition aux vulnérabilités dans votre environnement.",
+        "high_risk": "Risque Élevé",
+        "medium_risk": "Risque Moyen",
+        "low_risk": "Faible Risque",
+        "total_open": "Ouvert Total",
+        "review_reports": "Voir les Rapports",
+        "risk_trend": "Tendance des Risques",
+        "unable_load_risk_trend": "Impossible de charger la tendance des risques.",
+        "vulnerabilities_title": "Gestion des Vulnérabilités",
+        "vulnerabilities_description": "Examinez les détails des vulnérabilités, le statut et les associations d'actifs.",
+        "view_reports": "Voir les Rapports",
+        "loading_vulnerabilities": "Chargement des vulnérabilités...",
+        "no_vulnerabilities_found": "Aucune vulnérabilité trouvée.",
+        "unable_load_vulnerabilities": "Impossible de charger les vulnérabilités.",
+        "unassigned": "Non attribué",
+        "yes": "Oui",
+        "no": "Non",
+        "unknown": "Inconnu",
+        "security_overview_title": "Aperçu des Opérations de Sécurité",
+        "security_overview_description": "Surveillez l'activité des analyses, l'état des actifs et les tendances des vulnérabilités en un seul endroit.",
+        "launch_scan": "Lancer l'Analyse",
+        "recent_scan_history": "Historique des Analyses Récentes",
+        "notifications": "Notifications",
+        "trend_summary": "Résumé des Tendances",
+        "loading_latest_scans": "Chargement des dernières analyses...",
+        "no_recent_scans": "Aucune analyse récente disponible.",
+        "no_notifications": "Pas encore de notifications.",
+        "unable_load_history": "Impossible de charger l'historique des analyses.",
+            "loading_scan_history": "Impossible de charger l'historique des analyses.",
+        "unable_load_notifications": "Impossible de charger les notifications.",
+        "unable_load_trends": "Impossible de charger les tendances.",
+        "history_page_heading": "Historique des Analyses",
+        "history_page_description": "Consultez l'activité des analyses terminées et planifiées de votre compte.",
+        "back_to_dashboard": "Retour au tableau de bord",
+        "scan_id": "ID d'Analyse",
+        "target": "Cible",
+        "date": "Date",
+        "status": "Statut",
+        "high": "Élevé",
+        "medium": "Moyen",
+        "low": "Faible",
+        "loading_history": "Chargement de l'historique des analyses...",
+        "no_scan_history": "Aucun historique d'analyses disponible.",
+        "profile_label": "Profil",
+        "logged_in_as": "Connecté en tant que :",
+        "twofa_status": "État de l'authentification 2FA :",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "new_password": "Nouveau mot de passe",
+        "preferred_language": "Langue préférée",
+        "enable_mfa": "Activer l'authentification multi-facteurs (MFA)",
+        "apply_configuration": "Appliquer la configuration",
+        "settings_updated": "Paramètres mis à jour avec succès !",
+        "id_label": "ID",
+        "name_label": "Nom",
+        "asset_id_label": "ID d'Actif",
+        "vulnerability_id_label": "ID de Vulnérabilité",
+            "scan_id_label": "ID de scan",
+        "risk_score_label": "Score de Risque",
+        "alert_label": "Alerte",
+            "severity_label": "Gravité",
+        "count_label": "Nombre",
+        "related_vulnerabilities": "Vulnérabilités associées",
+        "loading_related_vulnerabilities": "Chargement des vulnérabilités associées...",
+        "no_related_vulnerabilities": "Aucune vulnérabilité associée trouvée.",
+        "unable_load_asset_details": "Impossible de charger les détails de l'actif.",
+        "back_to_assets": "Retour aux Actifs",
+        "save_asset": "Enregistrer l'actif",
+        "save_changes": "Enregistrer les modifications",
+        "edit_asset": "Modifier l'actif",
+        "delete_asset": "Supprimer l'actif",
+        "delete_asset_confirm": "Supprimer cet actif ? Cela ne peut pas être annulé.",
+        "unable_delete_asset": "Impossible de supprimer l'actif.",
+            "unable_update_asset": "Impossible de mettre à jour l'actif.",
+        "could_not_save_asset": "Impossible d'enregistrer l'actif.",
+        "asset_name": "Nom de l'actif",
+            "asset": "Actif",
+        "target_address": "Adresse cible",
+        "environment": "Environnement",
+        "criticality": "Criticité",
+        "internet_facing": "Accessible depuis Internet",
+        "add_asset_title": "Ajouter un nouvel actif",
+        "add_asset_description": "Créez un nouvel enregistrement d'actif pour l'inclure dans les inventaires d'analyse.",
+        "asset_details_description": "Examinez le profil de l'actif, le contexte des risques et les résultats d'analyse associés.",
+        "asset_name_placeholder": "Serveur de base de données",
+        "target_address_placeholder": "192.168.1.10 ou app.example.com",
+        "environment_placeholder": "Production, Staging, DMZ",
+        "low_label": "Faible",
+        "high_label": "Élevé",
+        "critical_label": "Critique",
+        "yes_label": "Oui",
+        "no_label": "Non",
+        "loading_remediation_details": "Chargement des détails de remédiation...",
+        "remediation_guidance": "Conseils de remédiation",
+        "vulnerability_detail_description": "Consultez le contexte de la vulnérabilité, l'association d'actifs et les conseils de remédiation.",
+            "vulnerability_detail_title": "Détails de la vulnérabilité",
+        "back_to_vulnerabilities": "Retour aux Vulnérabilités",
+        "vulnerability_not_found": "Vulnérabilité non trouvée.",
+        "unable_load_vulnerability_details": "Impossible de charger les détails de la vulnérabilité.",
+        "refer_scan_report": "Consultez le rapport d'analyse pour les détails de remédiation.",
+        "review_vendor_guidance": "Consultez les conseils du fournisseur et appliquez des modifications de configuration sécurisées.",
+        "scan_details_title": "Détails de l'analyse",
+        "scan_details_description": "Vue détaillée des résultats de l'analyse, des alertes et de l'état de remédiation.",
+        "back_to_scans": "Retour aux Analyses",
+        "alert_breakdown": "Répartition des alertes",
+        "loading_alert_breakdown": "Chargement de la répartition des alertes...",
+        "scan_record_not_found": "Enregistrement d'analyse non trouvé.",
+        "unable_load_scan_details": "Impossible de charger les détails de l'analyse.",
+        "scheduled_scans_title": "Analyses programmées",
+        "scheduled_scans_description": "Gérez les travaux d'analyse récurrents et ponctuels pour votre environnement.",
+        "create_schedule": "Créer une planification",
+        "schedule_id": "ID de planification",
+        "next_run": "Prochaine exécution",
+        "no_schedules_configured": "Aucune planification configurée.",
+        "unable_load_schedules": "Impossible de charger les planifications.",
+            "loading_schedules": "Impossible de charger les planifications.",
+        "active_status": "Actif",
+        "paused_status": "En pause",
+        "scan_management_title": "Gestion des analyses",
+        "scans_title": "Analyses",
+        "alerts_label": "Alertes",
+        "high_label": "Élevé",
+        "medium_label": "Moyen",
+        "low_label": "Faible",
+        "unable_load_scan_history": "Impossible de charger l'historique des analyses.",
+        "review_active_jobs": "Consultez les travaux actifs et les résultats d'analyse historiques.",
+        "no_scan_records_found": "Aucun enregistrement d'analyse trouvé.",
+        "delete_user_confirm": "Êtes-vous sûr de vouloir supprimer cet utilisateur ?",
+        "delete_button": "Supprimer",
+        "make_admin_button": "Rendre administrateur",
+        "remove_admin_button": "Retirer administrateur",
+        "user_role": "Rôle",
+            "username_label": "用户名",
+        "actions_label": "Actions",
+        "admin_panel_title": "Panneau d'administration",
+        "admin_panel_description": "Gérez les utilisateurs, les rôles et les tâches administratives privilégiées depuis une vue centralisée.",
+        "open_vulns": "Vulnérabilités ouvertes",
+        "active_jobs": "Travaux actifs",
+        "loading_notifications": "Chargement des notifications...",
+        "no_next_run": "Pas de prochaine exécution",
+        "settings_description": "Mettez à jour votre mot de passe et gérez la sécurité du compte, y compris 2FA.",
+        "total_assets": "Total des actifs",
+        "total_scans": "Total des analyses",
+        "unknown": "Inconnu"
+    },
+    "zh-CN": {
+        "dashboard": "仪表板",
+        "start_scan": "开始扫描",
+        "history": "历史记录",
+        "alerts": "警报",
+        "assets": "资产",
+        "reports": "报告",
+        "schedules": "计划",
+        "risk": "风险",
+        "knowledge": "知识库",
+        "administration": "管理",
+        "settings": "设置",
+        "logout": "退出",
+        "profile": "个人资料",
+        "new_scan": "+ 新扫描",
+        "help": "?",
+        "topbar_subtitle": "漏洞管理平台",
+        "asset_inventory_title": "资产清单",
+        "asset_inventory_description": "跟踪环境中的资产、托管和关键性。",
+        "add_new_asset": "添加新资产",
+        "loading_assets": "正在加载资产...",
+        "no_assets_found": "未找到资产。",
+        "unable_load_assets": "无法加载资产。",
+        "report_center_title": "报告中心",
+        "report_center_description": "从最近扫描结果生成可导出的 PDF、HTML、Excel 和 CSV 报告。",
+        "open_scan_history": "打开扫描历史",
+        "export_type": "导出类型",
+        "latest_scan": "最新扫描",
+        "action": "操作",
+        "loading_reports": "正在加载报告...",
+        "no_completed_scan_reports": "没有可用的已完成扫描报告。",
+        "download_pdf": "下载 PDF",
+        "download_html": "下载 HTML",
+        "download_excel": "下载 Excel",
+        "unable_load_report_summaries": "无法加载报告摘要。",
+        "knowledge_base_title": "知识库",
+        "knowledge_base_description": "浏览安全指南、CVE 上下文、MITRE 映射和修复最佳实践。",
+        "export_guidance": "导出指南",
+        "loading_knowledge_base": "正在加载知识库...",
+        "no_knowledge_base_articles": "没有可用的知识库文章。",
+        "unable_load_articles": "无法加载文章。",
+        "system": "系统",
+        "risk_management_title": "风险管理",
+        "risk_analysis": "风险分析",
+        "risk_description": "监控风险评分和环境中的漏洞暴露情况。",
+        "high_risk": "高风险",
+        "medium_risk": "中等风险",
+        "low_risk": "低风险",
+        "total_open": "总计打开",
+        "review_reports": "查看报告",
+        "risk_trend": "风险趋势",
+        "unable_load_risk_trend": "无法加载风险趋势数据。",
+        "vulnerabilities_title": "漏洞管理",
+        "vulnerabilities_description": "查看漏洞详细信息、状态和资产关联。",
+        "view_reports": "查看报告",
+        "loading_vulnerabilities": "正在加载漏洞...",
+        "no_vulnerabilities_found": "未找到漏洞。",
+        "unable_load_vulnerabilities": "无法加载漏洞。",
+        "unassigned": "未分配",
+        "yes": "是",
+        "no": "否",
+        "unknown": "未知",
+        "security_overview_title": "安全运营概览",
+        "security_overview_description": "在一个位置监控扫描活动、资产状态和漏洞趋势。",
+        "launch_scan": "启动扫描",
+        "recent_scan_history": "最近扫描历史",
+        "notifications": "通知",
+        "trend_summary": "趋势摘要",
+        "loading_latest_scans": "正在加载最新扫描...",
+        "no_recent_scans": "暂无最近扫描。",
+        "no_notifications": "尚无通知。",
+        "unable_load_history": "无法加载扫描历史。",
+            "loading_scan_history": "无法加载扫描历史。",
+        "unable_load_notifications": "无法加载通知。",
+        "unable_load_trends": "无法加载趋势。",
+        "history_page_heading": "扫描历史",
+        "history_page_description": "查看您的帐户中已完成和计划扫描的活动。",
+        "back_to_dashboard": "返回仪表板",
+        "scan_id": "扫描 ID",
+        "target": "目标",
+        "date": "日期",
+        "status": "状态",
+        "high": "高",
+        "medium": "中",
+        "low": "低",
+        "loading_history": "正在加载扫描历史...",
+        "no_scan_history": "暂无扫描历史。",
+        "profile_label": "个人资料",
+        "logged_in_as": "登录用户：",
+        "twofa_status": "双因素状态：",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "new_password": "新密码",
+        "preferred_language": "首选语言",
+        "enable_mfa": "启用多因素身份验证（MFA）",
+        "apply_configuration": "应用配置",
+        "settings_updated": "设置已成功更新！",
+        "id_label": "ID",
+        "name_label": "名称",
+        "asset_id_label": "资产 ID",
+        "vulnerability_id_label": "漏洞 ID",
+            "scan_id_label": "扫描 ID",
+        "risk_score_label": "风险评分",
+        "alert_label": "警报",
+            "severity_label": "严重性",
+        "count_label": "数量",
+        "related_vulnerabilities": "相关漏洞",
+        "loading_related_vulnerabilities": "正在加载相关漏洞...",
+        "no_related_vulnerabilities": "未找到相关漏洞。",
+        "unable_load_asset_details": "无法加载资产详细信息。",
+        "back_to_assets": "返回资产",
+        "save_asset": "保存资产",
+        "save_changes": "保存更改",
+        "edit_asset": "编辑资产",
+        "delete_asset": "删除资产",
+        "delete_asset_confirm": "删除此资产？此操作无法恢复。",
+        "unable_delete_asset": "无法删除资产。",
+        "unable_update_asset": "无法更新资产。",
+        "could_not_save_asset": "无法保存资产。",
+        "asset_name": "资产名称",
+        "asset": "资产",
+        "target_address": "目标地址",
+        "environment": "环境",
+        "criticality": "关键性",
+        "internet_facing": "面向互联网",
+        "add_asset_title": "添加新资产",
+        "add_asset_description": "创建新资产记录以将其包含在扫描库存中。",
+        "asset_details_description": "查看资产配置文件、风险上下文和关联扫描结果。",
+        "asset_name_placeholder": "数据库服务器",
+        "target_address_placeholder": "192.168.1.10 或 app.example.com",
+        "environment_placeholder": "生产、暂存、DMZ",
+        "low_label": "低",
+        "high_label": "高",
+        "critical_label": "严重",
+        "yes_label": "是",
+        "no_label": "否",
+        "loading_remediation_details": "正在加载修复详情...",
+        "remediation_guidance": "修复指南",
+        "vulnerability_detail_description": "查看漏洞上下文、资产关联和修复指南。",
+        "vulnerability_detail_title": "漏洞详情",
+        "back_to_vulnerabilities": "返回漏洞",
+        "vulnerability_not_found": "未找到漏洞。",
+        "unable_load_vulnerability_details": "无法加载漏洞详情。",
+        "refer_scan_report": "有关修复详情，请参阅扫描报告。",
+        "review_vendor_guidance": "查看供应商指南并应用安全配置更改。",
+        "scan_details_title": "扫描详情",
+        "scan_details_description": "扫描结果、警报和修复状态的详细视图。",
+        "back_to_scans": "返回扫描",
+        "alert_breakdown": "警报细分",
+        "loading_alert_breakdown": "正在加载警报细分...",
+        "scan_record_not_found": "未找到扫描记录。",
+        "unable_load_scan_details": "无法加载扫描详情。",
+        "scheduled_scans_title": "计划扫描",
+        "scheduled_scans_description": "管理环境中的定期和一次性扫描作业。",
+        "create_schedule": "创建计划",
+        "schedule_id": "计划 ID",
+        "next_run": "下次运行",
+        "no_schedules_configured": "未配置任何计划。",
+        "unable_load_schedules": "无法加载计划。",
+        "active_status": "活动",
+        "paused_status": "已暂停",
+        "scan_management_title": "扫描管理",
+        "scans_title": "扫描",
+        "alerts_label": "警报",
+        "high_label": "高",
+        "medium_label": "中",
+        "low_label": "低",
+        "unable_load_scan_history": "无法加载扫描历史。",
+        "review_active_jobs": "查看活动作业和历史扫描结果。",
+        "no_scan_records_found": "未找到扫描记录。",
+        "delete_user_confirm": "您确定要删除此用户吗？",
+        "delete_button": "删除",
+        "make_admin_button": "设为管理员",
+        "remove_admin_button": "取消管理员",
+        "user_role": "角色",
+        "actions_label": "操作",
+        "admin_panel_title": "管理员面板",
+        "admin_panel_description": "从集中视图管理用户、角色和特权管理任务。",
+        "open_vulns": "未解决漏洞",
+        "active_jobs": "活动作业",
+        "loading_notifications": "正在加载通知...",
+        "no_next_run": "无下次运行",
+        "settings_description": "更新密码并管理帐户安全设置，包括 2FA。",
+        "total_assets": "资产总数",
+        "total_scans": "扫描总数",
+        "unknown": "未知"
+    }
 }
 
 @app.route('/api/notifications')
@@ -1475,39 +2516,57 @@ def run_scans(target, scan_id, start_phase="Nmap", user_email=None):
 def settings():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT otp_secret FROM users WHERE username=?", (session.get("user"),))
+    c.execute("SELECT otp_secret, settings FROM users WHERE username=?", (session.get("user"),))
     row = c.fetchone()
     conn.close()
 
     twofa_enabled = bool(row and row[0])
-    return render_template("settings.html", user=session.get("user"), twofa_enabled=twofa_enabled)
+    language = "en"
+    if row and row[1]:
+        try:
+            settings_data = json.loads(row[1])
+            language = settings_data.get("language", "en")
+        except:
+            language = "en"
+
+    return render_template("settings.html", user=session.get("user"), twofa_enabled=twofa_enabled, language=language)
 @app.route('/settings', methods=['POST'])
 @login_required
 def update_settings():
     new_password = request.form.get("password")
     enable_2fa = request.form.get("2fa") == "on"
+    language = request.form.get("language")
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # ✅ Update password if provided
     if new_password and new_password.strip():
         hashed_pw = generate_password_hash(new_password.strip())
         c.execute("UPDATE users SET password=? WHERE username=?", (hashed_pw, session.get("user")))
 
-    # ✅ Update 2FA setting
     if enable_2fa:
-        # generate new secret if enabling
         otp_secret = pyotp.random_base32()
         c.execute("UPDATE users SET otp_secret=? WHERE username=?", (otp_secret, session.get("user")))
     else:
-        # disable 2FA by clearing secret
         c.execute("UPDATE users SET otp_secret=NULL WHERE username=?", (session.get("user"),))
+
+    if language:
+        c.execute("SELECT settings FROM users WHERE username=?", (session.get("user"),))
+        existing = c.fetchone()
+        settings_data = {}
+        if existing and existing[0]:
+            try:
+                settings_data = json.loads(existing[0])
+            except:
+                settings_data = {}
+        settings_data["language"] = language
+        c.execute("UPDATE users SET settings=? WHERE username=?", (json.dumps(settings_data), session.get("user")))
 
     conn.commit()
     conn.close()
 
-    flash("Settings updated successfully!", "success")
+    settings_lang = LANGUAGES.get(language or 'en', LANGUAGES.get('en', {}))
+    flash(settings_lang.get("settings_updated", "Settings updated successfully!"), "success")
     return redirect("/settings")
 
 
@@ -1887,12 +2946,11 @@ def terminate_scan(scan_id):   # ✅ renamed function
     }), 200
 
 
-@app.route('/history')
+@app.route('/api/history')
 @login_required
-def history():
+def history_api():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # ✅ Updated column selection
     is_admin = session.get("is_admin", False)
     if is_admin:
         c.execute("SELECT scan_id, target, date, alerts, profile, status, current_phase, fixed, user FROM scans ORDER BY id DESC")
@@ -1902,8 +2960,6 @@ def history():
     conn.close()
 
     history_data = []
-    
-    # 1. Past Scans
     for r in rows:
         try:
             alerts = json.loads(r[3]) if r[3] else []
@@ -1929,7 +2985,6 @@ def history():
         except:
             continue
 
-    # 2. Scheduled Jobs
     for job in scheduler.get_jobs():
         job_kwargs = job.kwargs if hasattr(job, "kwargs") else {}
         target = job_kwargs.get("target", "Unknown")
@@ -1954,6 +3009,11 @@ def history():
             })
 
     return jsonify(history_data)
+
+@app.route('/history')
+@login_required
+def history():
+    return render_template('history.html', user=session.get('user'))
 
 
 # ================= REPORT FIXED SYSTEM =================
@@ -2209,10 +3269,6 @@ def report_router():
     return "Invalid report type", 400
 
 
-# ================= RUN =================
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
 @app.route('/set-my-email/<username>/<path:email>')
 def set_my_email(username, email):
     conn = sqlite3.connect(DB_PATH)
@@ -2224,3 +3280,7 @@ def set_my_email(username, email):
     if updated == 0:
         return f"<h1>HACK FAILED: Username '{username}' not found in database!</h1>"
     return f"<h1>HACK SUCCESS: {username}'s email is now {email}</h1><p>You can now use the Forgot Password page!</p>"
+
+# ================= RUN =================
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)

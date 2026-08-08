@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.knowledge_base_title or 'Knowledge Base' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.knowledge_base_title or 'Knowledge Base' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.knowledge_base_title or 'Knowledge Base' }}</h2>
+            <p>{{ lang_strings.knowledge_base_description or 'Browse security guidance, CVE context, MITRE mappings, and remediation best practices.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-primary" href="/reports">{{ lang_strings.export_guidance or 'Export Guidance' }}</a>
+        </div>
+    </div>
+
+    <div class="panel-card">
+        <div class="knowledge-accordion" id="knowledgeAccordion">
+            <div class="knowledge-item active">
+                <button class="knowledge-trigger" type="button" aria-expanded="true">
+                    <span>What this tool does</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    VigiScan is a vulnerability scanning tool that identifies security weaknesses in web applications and network targets. It helps users detect, prioritize, and understand vulnerabilities, and provides actionable recommendations for remediation.
+                </div>
+            </div>
+
+            <div class="knowledge-item">
+                <button class="knowledge-trigger" type="button" aria-expanded="false">
+                    <span>How to Run a Scan</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    1. Enter a Target URL or IP address
+                    Example: https://example.com or 192.168.1.1
+                    2. Select a Scan Type:
+                    Web Scan → scans web applications
+                    IP Scan → checks open ports and services
+                    Full Scan → combines both
+                    3. Click Start Scan
+                </div>
+            </div>
+
+            <div class="knowledge-item">
+                <button class="knowledge-trigger" type="button" aria-expanded="false">
+                    <span>Scan Types Explained</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    Web Scan
+                    Scans web applications for vulnerabilities like XSS, SQL Injection, etc.
+
+                    IP Scan
+                    Identifies open ports and services on a network target.
+
+                    Full Scan
+                    Performs both IP and web scanning for deeper analysis.
+                </div>
+            </div>
+
+            <div class="knowledge-item">
+                <button class="knowledge-trigger" type="button" aria-expanded="false">
+                    <span>How to Read Results</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    High (🔴) → Critical vulnerabilities, fix immediately
+                    Medium (🟠) → Moderate risk, fix soon
+                    Low (🟢) → Minor issues
+
+                    Each result includes:
+                    • Vulnerability name
+                    • Affected URL or port
+                    • Description
+                    • Recommended fix
+                </div>
+            </div>
+
+            <div class="knowledge-item">
+                <button class="knowledge-trigger" type="button" aria-expanded="false">
+                    <span>Usage Guidelines</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    • Only scan systems you own or have permission to test
+                    • Scans may take a few minutes depending on target size
+                    • Results may require manual verification
+
+                    👉 This is important for your defense—shows awareness of ethics.
+                </div>
+            </div>
+
+            <div class="knowledge-item">
+                <button class="knowledge-trigger" type="button" aria-expanded="false">
+                    <span>Tips</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    Tips for Best Results
+                    • Use Full Scan for deeper analysis
+                    • Ensure target is reachable
+                    • For better accuracy, scan authenticated areas (if supported)
+                </div>
+            </div>
+
+            <div class="knowledge-item">
+                <button class="knowledge-trigger" type="button" aria-expanded="false">
+                    <span>Troubleshooting</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="knowledge-content">
+                    Troubleshooting Common Errors
+
+                    • Invalid URL/IP → Check format
+                    • Scan not starting → Ensure backend is running
+                    • No results → Target may not have detectable vulnerabilities
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const items = document.querySelectorAll('.knowledge-item');
+
+    items.forEach(item => {
+        const trigger = item.querySelector('.knowledge-trigger');
+        if (!trigger) return;
+
+        trigger.addEventListener('click', () => {
+            const isOpen = item.classList.contains('active');
+
+            items.forEach(entry => {
+                entry.classList.remove('active');
+                const entryTrigger = entry.querySelector('.knowledge-trigger');
+                if (entryTrigger) {
+                    entryTrigger.setAttribute('aria-expanded', 'false');
+                }
+            });
+
+            if (!isOpen) {
+                item.classList.add('active');
+                trigger.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

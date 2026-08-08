@@ -509,7 +509,7 @@
 
         function loadHistory() {
             showSection('history');
-            fetch("/history")
+            fetch("/api/history")
                 .then(res => res.json())
                 .then(data => {
                     let html = "";

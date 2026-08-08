@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.reports or 'Reports' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.reports or 'Reports' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.report_center_title or 'Report Center' }}</h2>
+            <p>{{ lang_strings.report_center_description or 'Generate exportable PDF, HTML, Excel, and CSV reports from recent scan results.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-primary" href="/history">{{ lang_strings.open_scan_history or 'Open Scan History' }}</a>
+        </div>
+    </div>
+    <div class="entity-table">
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th>Export Type</th>
+                    <th>Latest Scan</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="reportTableBody">
+                <tr><td colspan="3">{{ lang_strings.loading_reports or 'Loading reports...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function loadReportLinks() {
+    fetch('/api/history')
+        .then(res => res.json())
+        .then(rows => {
+            const body = document.getElementById('reportTableBody');
+            const latest = rows.find(r => !r.is_scheduled);
+            if (!latest) {
+                body.innerHTML = `<tr><td colspan="3">{{ lang_strings.no_completed_scan_reports or 'No completed scan reports available.' }}</td></tr>`;
+                return;
+            }
+            body.innerHTML = `
+                <tr>
+                    <td>PDF</td>
+                    <td>${latest.scan_id}</td>
+                    <td><a class="button button-secondary" href="${latest.report_pdf}">{{ lang_strings.download_pdf or 'Download PDF' }}</a></td>
+                </tr>
+                <tr>
+                    <td>HTML</td>
+                    <td>${latest.scan_id}</td>
+                    <td><a class="button button-secondary" href="${latest.report_html}">{{ lang_strings.download_html or 'Download HTML' }}</a></td>
+                </tr>
+                <tr>
+                    <td>Excel</td>
+                    <td>${latest.scan_id}</td>
+                    <td><a class="button button-secondary" href="${latest.report_excel}">{{ lang_strings.download_excel or 'Download Excel' }}</a></td>
+                </tr>
+            `;
+        })
+        .catch(() => {
+            document.getElementById('reportTableBody').innerHTML = `<tr><td colspan="3">{{ lang_strings.unable_load_report_summaries or 'Unable to load report summaries.' }}</td></tr>`;
+        });
+}
+window.addEventListener('DOMContentLoaded', loadReportLinks);
+</script>
+{% endblock %}

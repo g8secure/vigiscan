@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.scheduled_scans_title or 'Scheduled Scans' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.scheduled_scans_title or 'Scheduled Scans' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.scheduled_scans_title or 'Scheduled Scans' }}</h2>
+            <p>{{ lang_strings.scheduled_scans_description or 'Manage recurring and one-time scan jobs for your environment.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-primary" href="/dashboard">{{ lang_strings.create_schedule or 'Create Schedule' }}</a>
+        </div>
+    </div>
+    <div class="entity-table">
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.schedule_id or 'Schedule ID' }}</th>
+                    <th>{{ lang_strings.target or 'Target' }}</th>
+                    <th>{{ lang_strings.next_run or 'Next Run' }}</th>
+                    <th>{{ lang_strings.status or 'Status' }}</th>
+                </tr>
+            </thead>
+            <tbody id="schedulesTableBody">
+                <tr><td colspan="4">{{ lang_strings.loading_schedules or 'Loading schedules...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function loadSchedules() {
+    fetch('/api/schedules')
+        .then(res => res.json())
+        .then(items => {
+            const body = document.getElementById('schedulesTableBody');
+            if (!items.length) {
+                body.innerHTML = `<tr><td colspan="4">{{ lang_strings.no_schedules_configured or 'No schedules configured.' }}</td></tr>`;
+                return;
+            }
+            body.innerHTML = items.map(item => `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${item.target || '{{ lang_strings.unknown or 'Unknown' }}'}</td>
+                    <td>${item.next_run || '{{ lang_strings.paused_status or 'Paused' }}'}</td>
+                    <td>${item.next_run ? '{{ lang_strings.active_status or 'Active' }}' : '{{ lang_strings.paused_status or 'Paused' }}'}</td>
+                </tr>
+            `).join('');
+        })
+        .catch(() => {
+            document.getElementById('schedulesTableBody').innerHTML = `<tr><td colspan="4">{{ lang_strings.unable_load_schedules or 'Unable to load schedules.' }}</td></tr>`;
+        });
+}
+window.addEventListener('DOMContentLoaded', loadSchedules);
+</script>
+{% endblock %}

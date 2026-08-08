@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Authenticated Scan - VigiScan{% endblock %}
+{% block page_title %}Authenticated Scan{% endblock %}
+{% block content %}
+<div class="page-panel scan-form-page">
+    <div class="scan-form-card">
+        <div class="scan-form-icon"><i class="fas fa-magnifying-glass"></i></div>
+        <h1>Initiate Security Assessment</h1>
+        <p>Configure your target and security profile.</p>
+        <div class="auth-config-panel">
+            <div class="auth-config-title"><i class="fas fa-key"></i> Authenticated Access Configuration</div>
+            <form id="authScanForm">
+                <label for="authTargetInput">Target for Authentication</label>
+                <input id="authTargetInput" name="target" type="text" class="scan-input" placeholder="https://example.com/login" required>
+
+                <label for="authUserInput">Username / Key</label>
+                <input id="authUserInput" name="auth_user" type="text" class="scan-input" placeholder="Username / Key">
+
+                <label for="authPassInput">Password / Value</label>
+                <input id="authPassInput" name="auth_pass" type="password" class="scan-input" placeholder="Password / Value">
+
+                <input type="hidden" name="profile" value="deep">
+                <div class="form-actions">
+                    <button type="button" class="button button-primary" id="startAuthScanButton">START SCAN</button>
+                    <a class="button button-secondary" href="/scans">Cancel</a>
+                </div>
+                <div class="form-note" id="authScanMessage"></div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const start = document.getElementById('startAuthScanButton');
+    const message = document.getElementById('authScanMessage');
+
+    start.addEventListener('click', () => {
+        const form = document.getElementById('authScanForm');
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+
+        message.textContent = '';
+        start.disabled = true;
+        start.textContent = 'Starting…';
+
+        fetch('/api/trigger', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(async res => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw data;
+            window.location.href = '/scans';
+        })
+        .catch(err => {
+            message.textContent = err.error || 'Scan failed. Check the target and try again.';
+        })
+        .finally(() => {
+            start.disabled = false;
+            start.textContent = 'START SCAN';
+        });
+    });
+});
+</script>
+{% endblock %}

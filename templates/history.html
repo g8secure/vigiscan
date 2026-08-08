@@ -1,0 +1,74 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ lang_strings.history_page_heading or 'History' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.history_page_heading or 'Scan History' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.history_page_heading or 'Scan History' }}</h2>
+            <p>{{ lang_strings.history_page_description or 'Review completed and scheduled scan activity across your account.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-secondary" href="/dashboard">{{ lang_strings.back_to_dashboard or 'Back to Dashboard' }}</a>
+        </div>
+    </div>
+    <div class="entity-table">
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.scan_id or 'Scan ID' }}</th>
+                    <th>{{ lang_strings.target or 'Target' }}</th>
+                    <th>{{ lang_strings.date or 'Date' }}</th>
+                    <th>{{ lang_strings.status or 'Status' }}</th>
+                    <th>{{ lang_strings.high or 'High' }}</th>
+                    <th>{{ lang_strings.medium or 'Medium' }}</th>
+                    <th>{{ lang_strings.low or 'Low' }}</th>
+                </tr>
+            </thead>
+            <tbody id="historyTableBody">
+                <tr><td colspan="7">{{ lang_strings.loading_history or 'Loading scan history...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function renderHistory(rows) {
+    const body = document.getElementById('historyTableBody');
+    if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="7">{{ lang_strings.no_scan_history or 'No scan history available.' }}</td></tr>`;
+        return;
+    }
+
+    const sorted = rows.sort((a, b) => {
+        const aDate = a.date === 'Scheduled' ? 0 : new Date(a.date).getTime();
+        const bDate = b.date === 'Scheduled' ? 0 : new Date(b.date).getTime();
+        return bDate - aDate;
+    });
+
+    body.innerHTML = sorted.map(scan => `
+        <tr>
+            <td><a class="link-button" href="${scan.is_scheduled ? '#' : '/scans/' + scan.scan_id}">${scan.scan_id}</a></td>
+            <td>${scan.target}</td>
+            <td>${scan.date}${scan.is_scheduled ? ' (' + (scan.next_run_time || '{{ lang_strings.no_next_run or 'No next run' }}') + ')' : ''}</td>
+            <td>${scan.status}</td>
+            <td>${scan.high || 0}</td>
+            <td>${scan.medium || 0}</td>
+            <td>${scan.low || 0}</td>
+        </tr>
+    `).join('');
+}
+
+function loadHistory() {
+    fetch('/api/history')
+        .then(res => res.json())
+        .then(renderHistory)
+        .catch(() => {
+            document.getElementById('historyTableBody').innerHTML = `<tr><td colspan="7">{{ lang_strings.unable_load_history or 'Unable to load scan history.' }}</td></tr>`;
+        });
+}
+
+window.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+{% endblock %}

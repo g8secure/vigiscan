@@ -1,0 +1,248 @@
+﻿{% extends "base.html" %}
+{% block title %}Asset Details - VigiScan{% endblock %}
+{% block page_title %}Asset Details{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{% if asset_id == 0 %}{{ lang_strings.add_asset_title or 'Add New Asset' }}{% else %}{{ lang_strings.asset_id_label or 'Asset' }} #{{ asset_id }}{% endif %}</h2>
+            <p>{% if asset_id == 0 %}{{ lang_strings.add_asset_description or 'Create a new asset record to include it in scan inventories.' }}{% else %}{{ lang_strings.asset_details_description or 'Review the asset profile, risk context, and associated scan findings.' }}{% endif %}</p>
+        </div>
+        <div class="panel-card panel-actions" id="assetActions">
+            <a class="button button-secondary" href="/assets">{{ lang_strings.back_to_assets or 'Back to Assets' }}</a>
+            {% if asset_id != 0 %}
+                <button id="editAssetButton" class="button button-primary" type="button">{{ lang_strings.edit_asset or 'Edit Asset' }}</button>
+                <button id="deleteAssetButton" class="button button-secondary" type="button">{{ lang_strings.delete_asset or 'Delete Asset' }}</button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="entity-card" id="assetProfile">
+        {% if asset_id == 0 %}
+            <form id="assetForm" class="settings-form">
+                <div class="setting-item">
+                    <label for="name">{{ lang_strings.asset_name or 'Asset Name' }}</label>
+                    <input type="text" id="name" name="name" placeholder="{{ lang_strings.asset_name_placeholder or 'Database server' }}" required>
+                </div>
+                <div class="setting-item">
+                    <label for="target">{{ lang_strings.target_address or 'Target Address' }}</label>
+                    <input type="text" id="target" name="target" placeholder="{{ lang_strings.target_address_placeholder or '192.168.1.10 or app.example.com' }}" required>
+                </div>
+                <div class="setting-item">
+                    <label for="environment">{{ lang_strings.environment or 'Environment' }}</label>
+                    <input type="text" id="environment" name="environment" placeholder="{{ lang_strings.environment_placeholder or 'Production, Staging, DMZ' }}">
+                </div>
+                <div class="setting-item">
+                    <label for="criticality">{{ lang_strings.criticality or 'Criticality' }}</label>
+                    <select id="criticality" name="criticality">
+                        <option value="Low">{{ lang_strings.low_label or 'Low' }}</option>
+                        <option value="Medium" selected>{{ lang_strings.medium_label or 'Medium' }}</option>
+                        <option value="High">{{ lang_strings.high_label or 'High' }}</option>
+                        <option value="Critical">{{ lang_strings.critical_label or 'Critical' }}</option>
+                    </select>
+                </div>
+                <div class="setting-item setting-toggle">
+                    <input type="checkbox" id="internetFacing" name="internetFacing">
+                    <label for="internetFacing">{{ lang_strings.internet_facing or 'Internet Facing' }}</label>
+                </div>
+                <button type="submit" class="button button-primary">{{ lang_strings.save_asset or 'Save Asset' }}</button>
+            </form>
+        {% else %}
+            <p><strong>{{ lang_strings.asset_id_label or 'Asset ID' }}:</strong> {{ asset_id }}</p>
+            <p><strong>{{ lang_strings.name_label or 'Name' }}:</strong> Loading...</p>
+            <p><strong>{{ lang_strings.target_address or 'Target' }}:</strong> Loading...</p>
+            <p><strong>{{ lang_strings.environment or 'Environment' }}:</strong> Loading...</p>
+            <p><strong>{{ lang_strings.criticality or 'Criticality' }}:</strong> Loading...</p>
+            <p><strong>{{ lang_strings.internet_facing or 'Internet Facing' }}:</strong> Loading...</p>
+        {% endif %}
+    </div>
+    <div class="entity-card" id="assetEditCard" style="display:none;"></div>
+    <div class="entity-table" id="assetVulnTableWrapper" {% if asset_id == 0 %}style="display:none;"{% endif %}>
+        <h3>{{ lang_strings.related_vulnerabilities or 'Related Vulnerabilities' }}</h3>
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.id_label or 'ID' }}</th>
+                    <th>{{ lang_strings.alert_label or 'Alert' }}</th>
+                    <th>{{ lang_strings.severity_label or 'Severity' }}</th>
+                    <th>{{ lang_strings.status or 'Status' }}</th>
+                </tr>
+            </thead>
+            <tbody id="assetVulnBody">
+                <tr><td colspan="4">{{ lang_strings.loading_related_vulnerabilities or 'Loading related vulnerabilities...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const assetId = {{ asset_id }};
+let currentAsset = null;
+
+function setProfileHtml(asset) {
+    currentAsset = asset;
+    document.getElementById('assetProfile').innerHTML = `
+        <p><strong>{{ lang_strings.asset_id_label or 'Asset ID' }}:</strong> ${asset.id}</p>
+        <p><strong>{{ lang_strings.name_label or 'Name' }}:</strong> ${asset.name}</p>
+        <p><strong>{{ lang_strings.target_address or 'Target' }}:</strong> ${asset.target}</p>
+        <p><strong>{{ lang_strings.environment or 'Environment' }}:</strong> ${asset.environment || '{{ lang_strings.unknown or 'Unknown' }}'}</p>
+        <p><strong>{{ lang_strings.criticality or 'Criticality' }}:</strong> ${asset.criticality || '{{ lang_strings.medium_label or 'Medium' }}'}</p>
+        <p><strong>{{ lang_strings.internet_facing or 'Internet Facing' }}:</strong> ${asset.internet_facing ? '{{ lang_strings.yes_label or 'Yes' }}' : '{{ lang_strings.no_label or 'No' }}'}</p>
+    `;
+}
+
+function renderRelatedVulnerabilities(vulns) {
+    const body = document.getElementById('assetVulnBody');
+    if (!vulns.length) {
+        body.innerHTML = `<tr><td colspan="4">{{ lang_strings.no_related_vulnerabilities or 'No related vulnerabilities found.' }}</td></tr>`;
+        return;
+    }
+    body.innerHTML = vulns.map(v => `
+        <tr>
+            <td><a class="link-button" href="/vulnerabilities/${v.id}">${v.id}</a></td>
+            <td>${v.alert}</td>
+            <td>${v.risk}</td>
+            <td>${v.status}</td>
+        </tr>
+    `).join('');
+}
+
+function createEditForm(asset) {
+    return `
+        <form id="assetEditForm" class="settings-form">
+            <div class="setting-item">
+                <label for="editName">{{ lang_strings.asset_name or 'Asset Name' }}</label>
+                <input type="text" id="editName" name="name" value="${asset.name}" required>
+            </div>
+            <div class="setting-item">
+                <label for="editTarget">{{ lang_strings.target_address or 'Target Address' }}</label>
+                <input type="text" id="editTarget" name="target" value="${asset.target}" required>
+            </div>
+            <div class="setting-item">
+                <label for="editEnvironment">{{ lang_strings.environment or 'Environment' }}</label>
+                <input type="text" id="editEnvironment" name="environment" value="${asset.environment || ''}">
+            </div>
+            <div class="setting-item">
+                <label for="editCriticality">{{ lang_strings.criticality or 'Criticality' }}</label>
+                <select id="editCriticality" name="criticality">
+                    <option value="Low" ${asset.criticality === 'Low' ? 'selected' : ''}>{{ lang_strings.low_label or 'Low' }}</option>
+                    <option value="Medium" ${asset.criticality === 'Medium' ? 'selected' : ''}>{{ lang_strings.medium_label or 'Medium' }}</option>
+                    <option value="High" ${asset.criticality === 'High' ? 'selected' : ''}>{{ lang_strings.high_label or 'High' }}</option>
+                    <option value="Critical" ${asset.criticality === 'Critical' ? 'selected' : ''}>{{ lang_strings.critical_label or 'Critical' }}</option>
+                </select>
+            </div>
+            <div class="setting-item setting-toggle">
+                <input type="checkbox" id="editInternetFacing" name="internetFacing" ${asset.internet_facing ? 'checked' : ''}>
+                <label for="editInternetFacing">{{ lang_strings.internet_facing or 'Internet Facing' }}</label>
+            </div>
+            <button type="submit" class="button button-primary">{{ lang_strings.save_changes or 'Save Changes' }}</button>
+        </form>
+    `;
+}
+
+function enableAssetButtons() {
+    const editButton = document.getElementById('editAssetButton');
+    const deleteButton = document.getElementById('deleteAssetButton');
+    if (!editButton || !deleteButton) return;
+
+    editButton.addEventListener('click', () => {
+        const editCard = document.getElementById('assetEditCard');
+        editCard.style.display = editCard.style.display === 'none' || !editCard.style.display ? 'block' : 'none';
+        editCard.innerHTML = createEditForm(currentAsset);
+        document.getElementById('assetEditForm').addEventListener('submit', handleAssetUpdate);
+    });
+
+    deleteButton.addEventListener('click', () => {
+        if (!confirm("{{ lang_strings.delete_asset_confirm or 'Delete this asset? This cannot be undone.' }}")) return;
+        fetch(`/api/assets/${assetId}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.message) {
+                    window.location.href = '/assets';
+                } else {
+                    alert(data.error || '{{ lang_strings.unable_delete_asset or 'Unable to delete asset.' }}');
+                }
+            })
+            .catch(() => alert('{{ lang_strings.unable_delete_asset or 'Unable to delete asset.' }}'));
+    });
+}
+
+function handleAssetUpdate(event) {
+    event.preventDefault();
+    const payload = {
+        name: document.getElementById('editName').value.trim(),
+        target: document.getElementById('editTarget').value.trim(),
+        environment: document.getElementById('editEnvironment').value.trim(),
+        criticality: document.getElementById('editCriticality').value,
+        internet: document.getElementById('editInternetFacing').checked
+    };
+
+    fetch(`/api/assets/${assetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(res => res.json())
+      .then(data => {
+          if (data.message) {
+              setProfileHtml(payload);
+              document.getElementById('assetEditCard').style.display = 'none';
+          } else {
+              alert(data.error || '{{ lang_strings.unable_update_asset or 'Unable to update asset.' }}');
+          }
+      })
+      .catch(() => alert('{{ lang_strings.unable_update_asset or 'Unable to update asset.' }}'));
+}
+
+function loadAssetDetail() {
+    if (assetId === 0) {
+        document.getElementById('assetForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const payload = {
+                name: document.getElementById('name').value.trim(),
+                target: document.getElementById('target').value.trim(),
+                env: document.getElementById('environment').value.trim(),
+                criticality: document.getElementById('criticality').value,
+                internet: document.getElementById('internetFacing').checked
+            };
+
+            fetch('/api/admin/add_asset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(res => res.json())
+              .then(data => {
+                  if (data.message) {
+                      window.location.href = '/assets';
+                  } else {
+                      alert(data.error || '{{ lang_strings.could_not_save_asset or 'Could not save asset.' }}');
+                  }
+              })
+              .catch(() => alert('{{ lang_strings.could_not_save_asset or 'Unable to save asset.' }}'));
+        });
+        return;
+    }
+
+    fetch(`/api/assets/${assetId}`)
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(asset => {
+            setProfileHtml(asset);
+            enableAssetButtons();
+            return fetch('/api/vulnerabilities');
+        })
+        .then(res => res.json())
+        .then(allVulns => {
+            const related = allVulns.filter(v => v.asset_id === assetId);
+            renderRelatedVulnerabilities(related);
+        })
+        .catch(() => {
+            document.getElementById('assetProfile').innerHTML = '<p>{{ lang_strings.unable_load_asset_details or 'Unable to load asset details.' }}</p>';
+            const body = document.getElementById('assetVulnBody');
+            if (body) {
+                body.innerHTML = `<tr><td colspan="4">{{ lang_strings.unable_load_vulnerabilities or 'Unable to load vulnerabilities.' }}</td></tr>`;
+            }
+        });
+}
+
+window.addEventListener('DOMContentLoaded', loadAssetDetail);
+</script>
+{% endblock %}

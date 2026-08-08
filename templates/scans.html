@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.scans_title or 'Scans' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.scans_title or 'Scans' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.scan_management_title or 'Scan Management' }}</h2>
+            <p>{{ lang_strings.review_active_jobs or 'Review active jobs and historical scan results.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-primary" href="/dashboard">{{ lang_strings.start_scan or 'Start Scan' }}</a>
+        </div>
+    </div>
+    <div class="entity-table">
+        <table class="grid-table" id="scansTable">
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.scan_id_label or 'Scan ID' }}</th>
+                    <th>{{ lang_strings.target or 'Target' }}</th>
+                    <th>{{ lang_strings.date or 'Date' }}</th>
+                    <th>{{ lang_strings.progress or 'Progress' }}</th>
+                    <th>{{ lang_strings.status or 'Status' }}</th>
+                    <th>{{ lang_strings.high_label or 'High' }}</th>
+                    <th>{{ lang_strings.medium_label or 'Medium' }}</th>
+                    <th>{{ lang_strings.low_label or 'Low' }}</th>
+                </tr>
+            </thead>
+            <tbody id="scansTableBody">
+                <tr><td colspan="8">{{ lang_strings.loading_scan_history or 'Loading scan history...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function createProgressBar(progress) {
+    const percent = Math.max(0, Math.min(100, progress || 0));
+    return `
+        <div class="progress-track" aria-label="${percent}% complete">
+            <div class="progress-fill" style="width: ${percent}%;"></div>
+            <span class="progress-label">${percent}%</span>
+        </div>
+    `;
+}
+
+function renderScans(rows) {
+    const body = document.getElementById('scansTableBody');
+    if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="8">{{ lang_strings.no_scan_records_found or 'No scan records found.' }}</td></tr>`;
+        return;
+    }
+
+    body.innerHTML = rows.map(scan => {
+        const rowClass = scan.status === 'Completed' ? 'clickable-row' : '';
+        const progressCell = scan.status === 'Completed' || scan.status === 'Terminated' ? createProgressBar(100) : createProgressBar(scan.progress || 0);
+        const rowUrl = scan.status === 'Completed' ? `/scans/${scan.scan_id}` : '#';
+
+        return `
+            <tr class="${rowClass}" data-scan-id="${scan.scan_id}" data-scan-url="${rowUrl}">
+                <td><a class="link-button" href="/scans/${scan.scan_id}">${scan.scan_id}</a></td>
+                <td>${scan.target}</td>
+                <td>${scan.date}</td>
+                <td>${progressCell}</td>
+                <td>${scan.status}</td>
+                <td>${scan.high || 0}</td>
+                <td>${scan.medium || 0}</td>
+                <td>${scan.low || 0}</td>
+            </tr>
+        `;
+    }).join('');
+
+    document.querySelectorAll('.clickable-row').forEach(row => {
+        const url = row.getAttribute('data-scan-url');
+        if (!url || url === '#') return;
+        row.addEventListener('click', () => {
+            window.location.href = url;
+        });
+    });
+}
+
+function updateProgressForRunningScans(rows) {
+    rows.filter(scan => scan.status !== 'Completed' && scan.status !== 'Terminated').forEach(scan => {
+        fetch(`/status/${scan.scan_id}`)
+            .then(res => res.json())
+            .then(statusData => {
+                const rowElement = document.querySelector(`tr[data-scan-id="${scan.scan_id}"]`);
+                if (!rowElement) return;
+                const fill = rowElement.querySelector('.progress-fill');
+                const label = rowElement.querySelector('.progress-label');
+                if (fill && label) {
+                    const percent = Math.max(0, Math.min(100, statusData.progress || 0));
+                    fill.style.width = `${percent}%`;
+                    label.textContent = `${percent}%`;
+                }
+            })
+            .catch(() => {});
+    });
+}
+
+function loadScans() {
+    fetch('/api/history')
+        .then(res => res.json())
+        .then(data => {
+            const sorted = data.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
+            renderScans(sorted);
+            updateProgressForRunningScans(sorted);
+        })
+        .catch(() => {
+            document.getElementById('scansTableBody').innerHTML = `<tr><td colspan="8">{{ lang_strings.unable_load_scan_history or 'Unable to load scan history.' }}</td></tr>`;
+        });
+}
+
+window.addEventListener('DOMContentLoaded', loadScans);
+</script>
+{% endblock %}

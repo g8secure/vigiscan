@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.scan_details_title or 'Scan Details' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.scan_details_title or 'Scan Details' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.scan_details_title or 'Scan ID:' }} {{ scan_id }}</h2>
+            <p>{{ lang_strings.scan_details_description or 'Detailed view of scan results, alerts, and remediation status.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-secondary" href="/scans">{{ lang_strings.back_to_scans or 'Back to Scans' }}</a>
+        </div>
+    </div>
+    <div class="entity-card" id="scanSummary">
+        <p><strong>{{ lang_strings.scan_id_label or 'Scan ID' }}:</strong> {{ scan_id }}</p>
+        <p><strong>{{ lang_strings.target or 'Target' }}:</strong> Loading...</p>
+        <p><strong>{{ lang_strings.status or 'Status' }}:</strong> Loading...</p>
+        <p><strong>{{ lang_strings.profile_label or 'Profile' }}:</strong> Loading...</p>
+        <p><strong>{{ lang_strings.alerts_label or 'Alerts' }}:</strong> Loading...</p>
+    </div>
+    <div class="entity-table">
+        <h3>{{ lang_strings.alert_breakdown or 'Alert Breakdown' }}</h3>
+        <table class="grid-table">
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.severity_label or 'Severity' }}</th>
+                    <th>{{ lang_strings.count_label or 'Count' }}</th>
+                </tr>
+            </thead>
+            <tbody id="scanAlertBody">
+                <tr><td colspan="2">{{ lang_strings.loading_alert_breakdown or 'Loading alert breakdown...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function loadScanDetail() {
+    const scanId = '{{ scan_id }}';
+    fetch('/api/history')
+        .then(res => res.json())
+        .then(rows => {
+            const scan = rows.find(row => row.scan_id === scanId);
+            const summary = document.getElementById('scanSummary');
+            const body = document.getElementById('scanAlertBody');
+
+            if (!scan) {
+                summary.innerHTML = `<p>{{ lang_strings.scan_record_not_found or 'Scan record not found.' }}</p>`;
+                body.innerHTML = '';
+                return;
+            }
+
+            summary.innerHTML = `
+                <p><strong>{{ lang_strings.scan_id_label or 'Scan ID' }}:</strong> ${scan.scan_id}</p>
+                <p><strong>{{ lang_strings.target or 'Target' }}:</strong> ${scan.target}</p>
+                <p><strong>{{ lang_strings.status or 'Status' }}:</strong> ${scan.status}</p>
+                <p><strong>{{ lang_strings.profile_label or 'Profile' }}:</strong> ${scan.profile}</p>
+                <p><strong>{{ lang_strings.alerts_label or 'Alerts' }}:</strong> ${scan.alerts_count}</p>
+            `;
+
+            body.innerHTML = `
+                <tr><td>{{ lang_strings.high_label or 'High' }}</td><td>${scan.high}</td></tr>
+                <tr><td>{{ lang_strings.medium_label or 'Medium' }}</td><td>${scan.medium}</td></tr>
+                <tr><td>{{ lang_strings.low_label or 'Low' }}</td><td>${scan.low}</td></tr>
+            `;
+        })
+        .catch(() => {
+            document.getElementById('scanSummary').innerHTML = `<p>{{ lang_strings.unable_load_scan_details or 'Unable to load scan details.' }}</p>`;
+            document.getElementById('scanAlertBody').innerHTML = '';
+        });
+}
+window.addEventListener('DOMContentLoaded', loadScanDetail);
+</script>
+{% endblock %}

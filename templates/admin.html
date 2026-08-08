@@ -1,118 +1,75 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Admin Panel</title>
-
-<style>
-body {
-    font-family: Arial;
-    background: #0f172a;
-    color: white;
-    padding: 20px;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-th, td {
-    border: 1px solid #334155;
-    padding: 10px;
-}
-
-th { background: #1e293b; }
-
-button {
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-    margin-right: 5px;
-}
-
-.delete-btn {
-    background: #e74c3c;
-    color: white;
-}
-
-.make-btn {
-    background: #3498db;
-    color: white;
-}
-
-.remove-btn {
-    background: #f39c12;
-    color: white;
-}
-</style>
-</head>
-
-<body>
-
-<div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2>🛡️ Admin Panel</h2>
-    <a href="/dashboard" style="background: #38bdf8; color: #0f172a; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.9rem;">🏠 Dashboard</a>
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.admin_panel_title or 'Administration' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.admin_panel_title or 'Administration' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.admin_panel_title or 'Admin Panel' }}</h2>
+            <p>{{ lang_strings.admin_panel_description or 'Manage users, roles, and privileged administration tasks from a centralized view.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-secondary" href="/dashboard">{{ lang_strings.back_to_dashboard or 'Back to Dashboard' }}</a>
+        </div>
+    </div>
+    <div class="entity-card">
+        <p><strong>{{ lang_strings.logged_in_as or 'Logged in as:' }}</strong> {{ user }}</p>
+    </div>
+    <div class="entity-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.id_label or 'ID' }}</th>
+                    <th>{{ lang_strings.username_label or 'Username' }}</th>
+                    <th>{{ lang_strings.user_role or 'Role' }}</th>
+                    <th>{{ lang_strings.actions_label or 'Actions' }}</th>
+                </tr>
+            </thead>
+            <tbody id="userTable"></tbody>
+        </table>
+    </div>
 </div>
-<p>Logged in as: {{ user }}</p>
-
-<table>
-<thead>
-<tr>
-<th>ID</th>
-<th>Username</th>
-<th>Role</th>
-<th>Actions</th>
-</tr>
-</thead>
-
-<tbody id="userTable"></tbody>
-</table>
-
+{% endblock %}
+{% block scripts %}
 <script>
 function loadUsers(){
     fetch('/admin/users')
-    .then(res => res.json())
-    .then(data => {
-        let html = "";
-
-        data.forEach(u => {
-            html += `
-            <tr>
-                <td>${u.id}</td>
-                <td>${u.username}</td>
-                <td>${u.role}</td>
-                <td>
-                    <button class="delete-btn" onclick="deleteUser(${u.id})">Delete</button>
-                    <button class="make-btn" onclick="makeAdmin(${u.id})">Make Admin</button>
-                    <button class="remove-btn" onclick="removeAdmin(${u.id})">Remove Admin</button>
-                </td>
-            </tr>`;
+        .then(res => res.json())
+        .then(data => {
+            let html = "";
+            data.forEach(u => {
+                html += `
+                <tr>
+                    <td>${u.id}</td>
+                    <td>${u.username}</td>
+                    <td>${u.role}</td>
+                    <td>
+                        <button class="button button-secondary" onclick="deleteUser(${u.id})">{{ lang_strings.delete_button or 'Delete' }}</button>
+                        <button class="button button-secondary" onclick="makeAdmin(${u.id})">{{ lang_strings.make_admin_button or 'Make Admin' }}</button>
+                        <button class="button button-secondary" onclick="removeAdmin(${u.id})">{{ lang_strings.remove_admin_button or 'Remove Admin' }}</button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById("userTable").innerHTML = html;
         });
-
-        document.getElementById("userTable").innerHTML = html;
-    });
 }
 
 function deleteUser(id){
-    if(confirm("Are you sure you want to delete this user?")){
-        fetch('/admin/delete_user/' + id, { method: 'DELETE' })
+    if(!confirm("{{ lang_strings.delete_user_confirm or 'Are you sure you want to delete this user?' }}")) return;
+    fetch('/admin/delete_user/' + id, { method: 'DELETE' })
         .then(() => loadUsers());
-    }
 }
 
 function makeAdmin(id){
     fetch('/admin/make_admin/' + id)
-    .then(() => loadUsers());
+        .then(() => loadUsers());
 }
 
 function removeAdmin(id){
     fetch('/admin/remove_admin/' + id)
-    .then(() => loadUsers());
+        .then(() => loadUsers());
 }
 
 loadUsers();
 </script>
-
-</body>
-</html>
+{% endblock %}

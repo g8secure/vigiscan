@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.risk_management_title or 'Risk Management' }} - VigiScan{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block page_title %}{{ lang_strings.risk_management_title or 'Risk Management' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.risk_analysis or 'Risk Analysis' }}</h2>
+            <p>{{ lang_strings.risk_description or 'Monitor risk scores and vulnerability exposure across your environment.' }}</p>
+            <div class="dashboard-summary-grid">
+                <div class="summary-card">
+                    <span>{{ lang_strings.high_risk or 'High Risk' }}</span>
+                    <strong id="riskHigh">0</strong>
+                </div>
+                <div class="summary-card">
+                    <span>{{ lang_strings.medium_risk or 'Medium Risk' }}</span>
+                    <strong id="riskMedium">0</strong>
+                </div>
+                <div class="summary-card">
+                    <span>{{ lang_strings.low_risk or 'Low Risk' }}</span>
+                    <strong id="riskLow">0</strong>
+                </div>
+                <div class="summary-card">
+                    <span>{{ lang_strings.total_open or 'Total Open' }}</span>
+                    <strong id="riskTotal">0</strong>
+                </div>
+            </div>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-secondary" href="/reports">{{ lang_strings.review_reports or 'Review Reports' }}</a>
+        </div>
+    </div>
+    <div class="panel-card">
+        <h3>{{ lang_strings.risk_trend or 'Risk Trend' }}</h3>
+        <canvas id="riskTrendChart" height="220"></canvas>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function renderRiskTrend(data) {
+    const canvas = document.getElementById('riskTrendChart');
+    const labels = data.map(item => item.date);
+    const high = data.map(item => item.high || 0);
+    const medium = data.map(item => item.medium || 0);
+    const low = data.map(item => item.low || 0);
+
+    if (window.riskChart) {
+        window.riskChart.destroy();
+    }
+
+    window.riskChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: '{{ lang_strings.high or "High" }}', data: high, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.15)', tension: 0.3 },
+                { label: '{{ lang_strings.medium or "Medium" }}', data: medium, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)', tension: 0.3 },
+                { label: '{{ lang_strings.low or "Low" }}', data: low, borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.15)', tension: 0.3 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function loadRiskData() {
+    Promise.all([
+        fetch('/api/vulnerabilities').then(res => res.json()),
+        fetch('/api/trends').then(res => res.json())
+    ]).then(([vulns, trends]) => {
+        const high = vulns.filter(v => v.risk === 'High').length;
+        const medium = vulns.filter(v => v.risk === 'Medium').length;
+        const low = vulns.filter(v => v.risk === 'Low').length;
+        const total = vulns.length;
+
+        document.getElementById('riskHigh').innerText = high;
+        document.getElementById('riskMedium').innerText = medium;
+        document.getElementById('riskLow').innerText = low;
+        document.getElementById('riskTotal').innerText = total;
+        renderRiskTrend(trends);
+    }).catch(() => {
+        document.getElementById('riskTrendChart').closest('.panel-card').innerHTML = `<p>{{ lang_strings.unable_load_risk_trend or 'Unable to load risk trend data.' }}</p>`;
+    });
+}
+window.addEventListener('DOMContentLoaded', loadRiskData);
+</script>
+{% endblock %}

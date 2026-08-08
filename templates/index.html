@@ -162,7 +162,7 @@ function updateBar(id,v){let b=document.getElementById(id);b.style.width=v+"%";b
 function pollStatus(){fetch('/status').then(r=>r.json()).then(d=>{const s=document.getElementById("status");s.innerText=d.status;updateBar("spiderBar",d.spider);updateBar("activeBar",d.active);updateBar("nmapBar",d.nmap);if(d.status!=="✅ Scan completed")setTimeout(pollStatus,1500);else s.classList.remove("pulsing");loadAlerts();});}
 function updateRecurringPanel(){const p=document.getElementById("recurringContent");if(recurringScans.length===0){p.innerText="No recurring scans scheduled.";return;}p.innerHTML=recurringScans.map(r=>`<p>🌐 ${r.target} - ${r.recurring} | Next run: ${r.nextRun.toLocaleString()}</p>`).join("<hr>");}
 function loadAlerts(){fetch('/alerts').then(r=>r.json()).then(d=>{document.getElementById("alertsContent").innerHTML=d.alerts.map(a=>`<p>⚠️ ${a.alert} - ${a.risk}</p>`).join('')||"No alerts found";});}
-function loadHistory(){showSection('history');fetch('/history').then(r=>r.json()).then(d=>{document.getElementById("historyContent").innerHTML=d.map(s=>`<p>🌐 ${s[0]} <br> 📅 ${s[1]} <br> 🔴 High: ${s[2]} | 🟠 Medium: ${s[3]} | 🟡 Low: ${s[4]} | 🔵 Info: ${s[5]}</p><hr>`).join('')||"No history";});}
+function loadHistory(){showSection('history');fetch('/api/history').then(r=>r.json()).then(d=>{document.getElementById("historyContent").innerHTML=d.map(s=>`<p>🌐 ${s[0]} <br> 📅 ${s[1]} | 🔴 High: ${s[2]} | 🟠 Medium: ${s[3]} | 🟡 Low: ${s[4]} | 🔵 Info: ${s[5]}</p><hr>`).join('')||"No history";});}
 
 <!-- ✅ UPDATED FUNCTION -->
 function downloadReport(){

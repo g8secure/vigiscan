@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.vulnerabilities_title or 'Vulnerabilities' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.vulnerabilities_title or 'Vulnerability Management' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.vulnerabilities_title or 'Vulnerabilities' }}</h2>
+            <p>{{ lang_strings.vulnerabilities_description or 'Review vulnerability details, status, and asset associations.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-secondary" href="/reports">{{ lang_strings.view_reports or 'View Reports' }}</a>
+        </div>
+    </div>
+    <div class="entity-table">
+        <table class="grid-table" id="vulnTable">
+            <thead>
+                <tr>
+                    <th>{{ lang_strings.id_label or 'ID' }}</th>
+                    <th>{{ lang_strings.alert_label or 'Alert' }}</th>
+                    <th>{{ lang_strings.severity_label or 'Severity' }}</th>
+                    <th>{{ lang_strings.risk_score_label or 'Risk Score' }}</th>
+                    <th>{{ lang_strings.status or 'Status' }}</th>
+                    <th>{{ lang_strings.asset or 'Asset' }}</th>
+                </tr>
+            </thead>
+            <tbody id="vulnTableBody">
+                <tr><td colspan="6">{{ lang_strings.loading_vulnerabilities or 'Loading vulnerabilities...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function loadVulnerabilities() {
+    fetch('/api/vulnerabilities')
+        .then(res => res.json())
+        .then(items => {
+            const body = document.getElementById('vulnTableBody');
+            if (!items.length) {
+                body.innerHTML = `<tr><td colspan="6">{{ lang_strings.no_vulnerabilities_found or 'No vulnerabilities found.' }}</td></tr>`;
+                return;
+            }
+            body.innerHTML = items.map(item => `
+                <tr>
+                    <td><a class="link-button" href="/vulnerabilities/${item.id}">${item.id}</a></td>
+                    <td>${item.alert}</td>
+                    <td>${item.risk}</td>
+                    <td>${item.risk_score || 0}</td>
+                    <td>${item.status}</td>
+                    <td>${item.asset_name || '{{ lang_strings.unassigned or \'Unassigned\' }}'}</td>
+                </tr>
+            `).join('');
+        })
+        .catch(() => {
+            document.getElementById('vulnTableBody').innerHTML = `<tr><td colspan="6">{{ lang_strings.unable_load_vulnerabilities or 'Unable to load vulnerabilities.' }}</td></tr>`;
+        });
+}
+
+window.addEventListener('DOMContentLoaded', loadVulnerabilities);
+</script>
+{% endblock %}

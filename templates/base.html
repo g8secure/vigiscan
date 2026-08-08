@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VigiScan{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" aria-label="Primary navigation">
+            <div class="brand">
+                <div class="brand-icon"><i class="fas fa-shield-alt"></i></div>
+                <div class="brand-text">VigiScan</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-link{% if request.path == '/dashboard' %} active{% endif %}">
+                    <i class="fas fa-tachometer-alt"></i><span>{{ lang_strings.dashboard or 'Dashboard' }}</span>
+                </a>
+                <a href="/assets" class="nav-link{% if request.path.startswith('/assets') %} active{% endif %}">
+                    <i class="fas fa-network-wired"></i><span>{{ lang_strings.assets or 'Assets' }}</span>
+                </a>
+                <a href="/scans" class="nav-link{% if request.path.startswith('/scans') %} active{% endif %}">
+                    <i class="fas fa-play-circle"></i><span>{{ lang_strings.start_scan or 'Scans' }}</span>
+                </a>
+                <a href="/vulnerabilities" class="nav-link{% if request.path.startswith('/vulnerabilities') %} active{% endif %}">
+                    <i class="fas fa-bug"></i><span>{{ lang_strings.alerts or 'Vulnerabilities' }}</span>
+                </a>
+                <a href="/reports" class="nav-link{% if request.path == '/reports' %} active{% endif %}">
+                    <i class="fas fa-file-alt"></i><span>{{ lang_strings.reports or 'Reports' }}</span>
+                </a>
+                <a href="/history" class="nav-link{% if request.path == '/history' %} active{% endif %}">
+                    <i class="fas fa-history"></i><span>{{ lang_strings.history or 'History' }}</span>
+                </a>
+                <a href="/schedules" class="nav-link{% if request.path == '/schedules' %} active{% endif %}">
+                    <i class="fas fa-calendar-alt"></i><span>{{ lang_strings.schedules or 'Schedules' }}</span>
+                </a>
+                <a href="/risk" class="nav-link{% if request.path == '/risk' %} active{% endif %}">
+                    <i class="fas fa-chart-line"></i><span>{{ lang_strings.risk or 'Risk' }}</span>
+                </a>
+                <a href="/knowledge-base" class="nav-link{% if request.path.startswith('/knowledge-base') %} active{% endif %}">
+                    <i class="fas fa-book"></i><span>{{ lang_strings.knowledge or 'Knowledge Base' }}</span>
+                </a>
+                <a href="/admin" class="nav-link{% if request.path.startswith('/admin') %} active{% endif %}">
+                    <i class="fas fa-user-shield"></i><span>{{ lang_strings.administration or 'Administration' }}</span>
+                </a>
+                <a href="/settings" class="nav-link{% if request.path == '/settings' %} active{% endif %}">
+                    <i class="fas fa-cog"></i><span>{{ lang_strings.settings or 'Settings' }}</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="sidebar-user">{{ user or 'Guest' }}</div>
+            </div>
+        </aside>
+
+        <div class="main-shell">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <div class="topbar-title">
+                        <h1>{% block page_title %}VigiScan{% endblock %}</h1>
+                        <p class="topbar-subtitle">{{ lang_strings.topbar_subtitle or 'Vulnerability management platform' }}</p>
+                    </div>
+                </div>
+                <div class="topbar-center">
+                    <div class="topbar-dropdown">
+                        <button class="topbar-button topbar-dropdown-toggle" type="button" aria-haspopup="true" aria-expanded="false">
+                            {{ lang_strings.reports or 'Reports' }} <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="topbar-dropdown-menu" role="menu">
+                            <a class="topbar-dropdown-item" href="/reports"><i class="fas fa-file-pdf"></i> {{ lang_strings.download_pdf or 'Download PDF' }}</a>
+                            <a class="topbar-dropdown-item" href="/reports"><i class="fas fa-file-code"></i> {{ lang_strings.download_html or 'Download HTML' }}</a>
+                            <a class="topbar-dropdown-item" href="/reports"><i class="fas fa-file-excel"></i> {{ lang_strings.download_excel or 'Download Excel' }}</a>
+                            <a class="topbar-dropdown-item" href="/history"><i class="fas fa-history"></i> {{ lang_strings.view_history or 'View History' }}</a>
+                            <a class="topbar-dropdown-item" href="/risk"><i class="fas fa-brain"></i> {{ lang_strings.ai_risk_assessment or 'AI Risk Assessment' }}</a>
+                        </div>
+                    </div>
+                    <div class="topbar-dropdown">
+                        <button class="topbar-button topbar-button-primary topbar-dropdown-toggle" type="button" aria-haspopup="true" aria-expanded="false">
+                            {{ lang_strings.new_scan or '+ NEW SCAN' }} <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="topbar-dropdown-menu topbar-dropdown-menu-right" role="menu">
+                            <a class="topbar-dropdown-item" href="/scans/new"><i class="fas fa-search"></i> {{ lang_strings.new_vulnerability_scan or 'New Vulnerability Scan' }}</a>
+                            <a class="topbar-dropdown-item" href="/scans/authenticated"><i class="fas fa-key"></i> {{ lang_strings.authenticated_scan or 'Authenticated Scan' }}</a>
+                        </div>
+                    </div>
+                    <div class="topbar-dropdown">
+                        <button class="topbar-button topbar-dropdown-toggle" type="button" aria-haspopup="true" aria-expanded="false">
+                            {{ lang_strings.help or '?' }} <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <div class="topbar-dropdown-menu topbar-dropdown-menu-right" role="menu">
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-hand-holding-medical"></i> {{ lang_strings.help_tool_description or 'What This Tool Does' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-globe"></i> {{ lang_strings.help_start_scan or 'How to Start a Scan' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-search"></i> {{ lang_strings.help_scan_types or 'Understanding Scan Types' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-chart-bar"></i> {{ lang_strings.help_results or 'Understanding Results' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-exclamation-triangle"></i> {{ lang_strings.help_notes or 'Important Notes' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-brain"></i> {{ lang_strings.help_tips or 'Tips for Best Results' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-times-circle"></i> {{ lang_strings.help_errors or 'Common Errors' }}</a>
+                            <a class="topbar-dropdown-item" href="/knowledge-base"><i class="fas fa-rocket"></i> {{ lang_strings.restart_tour or 'Restart Welcome Tour' }}</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <select id="languageSelect" class="topbar-select" aria-label="Language selector">
+                        <option value="en" {% if user_lang == 'en' %}selected{% endif %}>English (US)</option>
+                        <option value="uk_en" {% if user_lang == 'uk_en' %}selected{% endif %}>English (UK)</option>
+                        <option value="es" {% if user_lang == 'es' %}selected{% endif %}>Español</option>
+                        <option value="fr" {% if user_lang == 'fr' %}selected{% endif %}>Français</option>
+                        <option value="zh-CN" {% if user_lang == 'zh-CN' %}selected{% endif %}>中文</option>
+                    </select>
+                    <a class="icon-button" href="/settings" title="Notifications / Settings"><i class="fas fa-bell"></i></a>
+                    <a class="topbar-action" href="/profile"><i class="fas fa-user-circle"></i> {{ user or 'Guest' }}</a>
+                </div>
+            </header>
+
+            <main class="page-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='main.js') }}" defer></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

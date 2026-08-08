@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ lang_strings.assets or 'Assets' }} - VigiScan{% endblock %}
+{% block page_title %}{{ lang_strings.asset_inventory_title or 'Asset Inventory' }}{% endblock %}
+{% block content %}
+<div class="page-panel">
+    <div class="panel-grid">
+        <div class="panel-card">
+            <h2>{{ lang_strings.asset_inventory_title or 'Asset Inventory' }}</h2>
+            <p>{{ lang_strings.asset_inventory_description or 'Track assets, hosting, and criticality across your environment.' }}</p>
+        </div>
+        <div class="panel-card panel-actions">
+            <a class="button button-primary" href="/assets/0">{{ lang_strings.add_new_asset or 'Add New Asset' }}</a>
+        </div>
+    </div>
+    <div class="entity-table">
+        <table class="grid-table" id="assetsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Target</th>
+                    <th>Environment</th>
+                    <th>Criticality</th>
+                    <th>Internet Facing</th>
+                </tr>
+            </thead>
+            <tbody id="assetsTableBody">
+                <tr><td colspan="6">{{ lang_strings.loading_assets or 'Loading assets...' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function loadAssets() {
+    fetch('/api/assets')
+        .then(res => res.json())
+        .then(items => {
+            const body = document.getElementById('assetsTableBody');
+            if (!items.length) {
+                body.innerHTML = `<tr><td colspan="6">{{ lang_strings.no_assets_found or 'No assets found.' }}</td></tr>`;
+                return;
+            }
+            body.innerHTML = items.map(asset => `
+                <tr>
+                    <td>${asset.id}</td>
+                    <td><a class="link-button" href="/assets/${asset.id}">${asset.name}</a></td>
+                    <td>${asset.target || 'N/A'}</td>
+                    <td>${asset.environment || 'Unknown'}</td>
+                    <td>${asset.criticality || 'Medium'}</td>
+                    <td>${asset.internet_facing ? 'Yes' : 'No'}</td>
+                </tr>
+            `).join('');
+        })
+        .catch(() => {
+            document.getElementById('assetsTableBody').innerHTML = `<tr><td colspan="6">{{ lang_strings.unable_load_assets or 'Unable to load assets.' }}</td></tr>`;
+        });
+}
+
+window.addEventListener('DOMContentLoaded', loadAssets);
+</script>
+{% endblock %}
