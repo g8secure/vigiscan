@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.name }} - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span>
+        <a href="/assets">Assets</a> <span class="sep">/</span>
+        <span>{{ asset.name }}</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">{{ asset.name }}</h1>
+            <p class="page-subtitle">{{ asset.ip or asset.domain or 'No target' }}</p>
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <a href="/scans?target={{ asset.ip or asset.domain }}" class="btn btn-primary"><i class="fas fa-play"></i> Scan Asset</a>
+            <a href="/assets" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Assets</a>
+        </div>
+    </div>
+
+    <!-- ASSET INFO -->
+    <div class="grid-3">
+        <div class="card" style="margin:0;">
+            <h3>Asset Details</h3>
+            <table style="border-spacing:0;">
+                <tbody>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Name:</strong></td><td style="border:none; padding:0.5rem 0;">{{ asset.name }}</td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>IP Address:</strong></td><td style="border:none; padding:0.5rem 0;" class="font-mono">{{ asset.ip or 'N/A' }}</td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Domain:</strong></td><td style="border:none; padding:0.5rem 0;" class="font-mono">{{ asset.domain or 'N/A' }}</td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Owner:</strong></td><td style="border:none; padding:0.5rem 0;">{{ asset.owner or 'N/A' }}</td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Group:</strong></td><td style="border:none; padding:0.5rem 0;">{{ asset.asset_group or 'Default' }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card" style="margin:0;">
+            <h3>Classification</h3>
+            <table style="border-spacing:0;">
+                <tbody>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Environment:</strong></td><td style="border:none; padding:0.5rem 0;"><span class="risk-badge risk-info">{{ asset.environment }}</span></td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Criticality:</strong></td><td style="border:none; padding:0.5rem 0;"><span class="risk-badge risk-{{ asset.criticality.lower() }}">{{ asset.criticality }}</span></td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Exposure:</strong></td><td style="border:none; padding:0.5rem 0;">{{ '🌐 Internet Facing' if asset.is_internet_facing else '🔒 Internal' }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card" style="margin:0;">
+            <h3>Quick Actions</h3>
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <a href="/scans?target={{ asset.ip or asset.domain }}" class="btn btn-primary"><i class="fas fa-search"></i> Start Scan</a>
+                <a href="/vulnerabilities" class="btn btn-secondary"><i class="fas fa-bug"></i> View Vulnerabilities</a>
+                <a href="/risk" class="btn btn-secondary"><i class="fas fa-chart-line"></i> Risk Assessment</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- VULNERABILITIES FOR THIS ASSET -->
+    <div class="card mt-2">
+        <h3>Vulnerabilities for this Asset <a href="/vulnerabilities" class="btn-link" style="font-size:0.75rem;">View All →</a></h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vulnerability</th>
+                        <th>Severity</th>
+                        <th>Risk Score</th>
+                        <th>Status</th>
+                        <th>Found</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="assetVulnsBody">
+                    <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SCAN HISTORY FOR THIS ASSET -->
+    <div class="card">
+        <h3>Scan History <a href="/scans" class="btn-link" style="font-size:0.75rem;">View All →</a></h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Scan ID</th>
+                        <th>Date</th>
+                        <th>Profile</th>
+                        <th>Status</th>
+                        <th>Alerts</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="assetScansBody">
+                    <tr><td colspan="6" class="empty-state">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const assetTarget = "{{ asset.ip or asset.domain }}";
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadAssetVulns();
+    loadAssetScans();
+});
+
+function loadAssetVulns() {
+    fetch('/api/vulnerabilities')
+        .then(res => res.json())
+        .then(data => {
+            const filtered = data.filter(v => v.asset_name === "{{ asset.name }}");
+            const body = document.getElementById('assetVulnsBody');
+            if (filtered.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="empty-state">No vulnerabilities found for this asset.</td></tr>';
+                return;
+            }
+            body.innerHTML = filtered.map(v => `
+                <tr class="clickable" onclick="window.location='/vulnerabilities/${v.id}'">
+                    <td><strong>${v.alert}</strong></td>
+                    <td><span class="risk-badge risk-${(v.risk||'info').toLowerCase()}">${v.risk}</span></td>
+                    <td><span class="risk-badge risk-${(v.risk||'info').toLowerCase()}">${v.risk_score}</span></td>
+                    <td>${statusBadge(v.status)}</td>
+                    <td>${v.date_found ? v.date_found.split('T')[0] : 'N/A'}</td>
+                    <td><a href="/vulnerabilities/${v.id}" class="btn-link"><i class="fas fa-eye"></i> View</a></td>
+                </tr>
+            `).join('');
+        });
+}
+
+function loadAssetScans() {
+    fetch('/history')
+        .then(res => res.json())
+        .then(data => {
+            const filtered = data.filter(s => !s.is_scheduled && s.target === assetTarget);
+            const body = document.getElementById('assetScansBody');
+            if (filtered.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="empty-state">No scans found for this asset.</td></tr>';
+                return;
+            }
+            body.innerHTML = filtered.map(s => `
+                <tr class="clickable" onclick="window.location='/scans/${s.scan_id}'">
+                    <td class="font-mono">${s.scan_id}</td>
+                    <td>${s.date.replace('T', ' ').split('.')[0]}</td>
+                    <td><span class="risk-badge risk-info">${s.profile}</span></td>
+                    <td>${statusBadge(s.status)}</td>
+                    <td>${s.alerts_count}</td>
+                    <td><a href="/scans/${s.scan_id}" class="btn-link"><i class="fas fa-eye"></i> View</a></td>
+                </tr>
+            `).join('');
+        });
+}
+</script>
+{% endblock %}

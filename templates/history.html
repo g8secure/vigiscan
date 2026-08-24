@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Scan History - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>History</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Scan History</h1>
+            <p class="page-subtitle">Complete record of all vulnerability assessments</p>
+        </div>
+        <a href="/scans" class="btn btn-primary"><i class="fas fa-search"></i> New Scan</a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="historySearch" placeholder="Search by target..." onkeyup="loadHistory()">
+            <select id="statusFilter" onchange="loadHistory()">
+                <option value="">All Statuses</option>
+                <option value="Completed">Completed</option>
+                <option value="Running">Running</option>
+                <option value="Terminated">Terminated</option>
+                <option value="Failed">Failed</option>
+            </select>
+            <span class="text-muted text-small" id="historyCount"></span>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Date</th>
+                        <th>Profile</th>
+                        <th>Status</th>
+                        <th>High</th>
+                        <th>Medium</th>
+                        <th>Low</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="8" class="empty-state">Loading history...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadHistory);
+
+function loadHistory() {
+    const search = document.getElementById('historySearch').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value;
+
+    fetch('/history')
+        .then(res => res.json())
+        .then(data => {
+            let scans = data.filter(s => !s.is_scheduled);
+            if (status) scans = scans.filter(s => s.status === status);
+            if (search) scans = scans.filter(s => s.target.toLowerCase().includes(search));
+
+            document.getElementById('historyCount').innerText = `(${scans.length} scans)`;
+
+            const body = document.getElementById('historyBody');
+            if (scans.length === 0) {
+                body.innerHTML = '<tr><td colspan="8" class="empty-state">No scan history found. <a href="/scans">Start your first scan →</a></td></tr>';
+                return;
+            }
+
+            body.innerHTML = scans.map(s => `
+                <tr class="clickable" onclick="window.location='/scans/${s.scan_id}'">
+                    <td><strong>${s.target}</strong></td>
+                    <td>${s.date.replace('T', ' ').split('.')[0]}</td>
+                    <td><span class="risk-badge risk-info">${s.profile}</span></td>
+                    <td>${statusBadge(s.status)}</td>
+                    <td><span class="risk-badge risk-high">${s.high}</span></td>
+                    <td><span class="risk-badge risk-medium">${s.medium}</span></td>
+                    <td><span class="risk-badge risk-low">${s.low}</span></td>
+                    <td onclick="event.stopPropagation()">
+                        <a href="/scans/${s.scan_id}" class="btn-link" title="View Details"><i class="fas fa-eye"></i></a>
+                        <a href="/report?scan_id=${s.scan_id}&type=pdf" class="btn-link" title="PDF Report"><i class="fas fa-file-pdf"></i></a>
+                        <a href="/report?scan_id=${s.scan_id}&type=html" class="btn-link" title="HTML Report"><i class="fas fa-file-code"></i></a>
+                        <a href="/report?scan_id=${s.scan_id}&type=excel" class="btn-link" title="Excel Report"><i class="fas fa-file-excel"></i></a>
+                        ${s.can_delete ? `<button class="btn-link" style="color:#ef4444;" onclick="deleteScan('${s.scan_id}')" title="Delete"><i class="fas fa-trash"></i></button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function deleteScan(scanId) {
+    if (!confirm("Are you sure you want to permanently delete this scan?")) return;
+    axios.delete(`/delete_scan/${scanId}`)
+        .then(() => loadHistory())
+        .catch(err => alert(err.response?.data?.error || "Failed to delete scan"));
+}
+</script>
+{% endblock %}

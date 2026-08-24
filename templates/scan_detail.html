@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Scan Details - {{ scan.target }} - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span>
+        <a href="/scans">Scans</a> <span class="sep">/</span>
+        <span>{{ scan.scan_id }}</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Scan: {{ scan.target }}</h1>
+            <p class="page-subtitle">Scan ID: {{ scan.scan_id }} | {{ scan.date.replace('T', ' ').split('.')[0] if scan.date else 'In progress' }}</p>
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <a href="/report?scan_id={{ scan.scan_id }}&type=pdf" class="btn btn-primary"><i class="fas fa-file-pdf"></i> PDF Report</a>
+            <a href="/report?scan_id={{ scan.scan_id }}&type=html" class="btn btn-secondary"><i class="fas fa-file-code"></i> HTML</a>
+            <a href="/report?scan_id={{ scan.scan_id }}&type=excel" class="btn btn-secondary"><i class="fas fa-file-excel"></i> Excel</a>
+            <a href="/scans" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
+    </div>
+
+    {% if scan.is_live %}
+    <div class="card" style="background:rgba(56,189,248,0.05); border:1px solid var(--accent-primary);">
+        <h3>🔄 Scan In Progress</h3>
+        <p class="text-muted">Current Phase: <strong>{{ scan.current_phase }}</strong></p>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">Network Discovery</div>
+        <div class="progress-container" style="height:8px; background:#eee;">
+            <div class="progress-bar" id="nmap_bar" style="background:var(--accent-primary);">0%</div>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.75rem; margin-bottom:0.25rem;">Vulnerability Scan</div>
+        <div class="progress-container" style="height:8px; background:#eee;">
+            <div class="progress-bar" id="spider_bar" style="background:#f9a825;">0%</div>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.75rem; margin-bottom:0.25rem;">Advanced Analysis</div>
+        <div class="progress-container" style="height:8px; background:#eee;">
+            <div class="progress-bar" id="active_bar" style="background:#ed1c24;">0%</div>
+        </div>
+        <div style="margin-top:1rem;">
+            <span id="live_status" class="status-badge status-in-progress">{{ scan.status }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Summary -->
+    <div class="stats-grid">
+        <div class="stat-card" style="cursor:default;">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value" id="total_alerts">{{ scan.alerts|length }}</div>
+            <div class="stat-label">Total Alerts</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+            <div class="stat-icon">🔴</div>
+            <div class="stat-value" id="high_count">{{ scan.alerts|selectattr('risk', 'equalto', 'High')|list|length }}</div>
+            <div class="stat-label">High Risk</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+            <div class="stat-icon">🟠</div>
+            <div class="stat-value" id="med_count">{{ scan.alerts|selectattr('risk', 'equalto', 'Medium')|list|length }}</div>
+            <div class="stat-label">Medium Risk</div>
+        </div>
+        <div class="stat-card" style="cursor:default;">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-value" id="low_count">{{ scan.alerts|selectattr('risk', 'equalto', 'Low')|list|length }}</div>
+            <div class="stat-label">Low / Info</div>
+        </div>
+    </div>
+
+    <!-- Scan Info -->
+    <div class="grid-3">
+        <div class="card" style="margin:0;">
+            <h3>Scan Information</h3>
+            <table style="border-spacing:0;">
+                <tbody>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Target:</strong></td><td style="border:none; padding:0.5rem 0;" class="font-mono">{{ scan.target }}</td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Profile:</strong></td><td style="border:none; padding:0.5rem 0;"><span class="risk-badge risk-info">{{ scan.profile }}</span></td></tr>
+                    <tr><td style="border:none; padding:0.5rem 0;"><strong>Status:</strong></td><td style="border:none; padding:0.5rem 0;">{{ statusBadge(scan.status) }}</td></tr>
+                    {% if scan.user %}<tr><td style="border:none; padding:0.5rem 0;"><strong>User:</strong></td><td style="border:none; padding:0.5rem 0;">{{ scan.user }}</td></tr>{% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card" style="margin:0;">
+            <h3>Quick Actions</h3>
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <a href="/vulnerabilities?scan_id={{ scan.scan_id }}" class="btn btn-primary"><i class="fas fa-bug"></i> View Vulnerabilities</a>
+                <a href="/risk" class="btn btn-secondary"><i class="fas fa-chart-line"></i> Risk Assessment</a>
+                <a href="/knowledge-base" class="btn btn-secondary"><i class="fas fa-book"></i> Remediation Guide</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Open Ports & Services -->
+    {% if port_entries is defined %}
+    <div class="card mt-2" id="open-ports">
+        <h3>🖧 Open Ports & Services <span class="text-muted text-small" style="font-weight:400;">{{ port_entries|length }} discovered</span></h3>
+        <p class="text-muted text-small" style="margin-bottom:1rem;">
+            Open ports represent <strong>attack surface</strong>, not necessarily vulnerabilities.
+            Risk is assigned only when supported by the detected service, version, configuration, or vulnerability intelligence.
+            If a service cannot be confidently identified, it is marked <em>Unknown / Requires Assessment</em>.
+        </p>
+        {% if port_entries %}
+        <div class="table-container">
+            <table class="ports-table">
+                <thead>
+                    <tr>
+                        <th>Port</th>
+                        <th>Protocol</th>
+                        <th>Service</th>
+                        <th>Risk</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in port_entries %}
+                    {% set risk_key = 'unknown' %}
+                    {% if p.risk == 'Critical' %}
+                        {% set risk_key = 'critical' %}
+                    {% elif p.risk == 'High' %}
+                        {% set risk_key = 'high' %}
+                    {% elif p.risk == 'Medium' %}
+                        {% set risk_key = 'medium' %}
+                    {% elif p.risk == 'Low' %}
+                        {% set risk_key = 'low' %}
+                    {% elif p.risk == 'Informational' %}
+                        {% set risk_key = 'info' %}
+                    {% endif %}
+                    <tr>
+                        <td class="font-mono port-number">{{ p.port }}</td>
+                        <td><span class="protocol-badge">{{ p.protocol }}</span></td>
+                        <td>
+                            <strong>{{ p.service }}</strong>
+                            {% if p.note %}<div class="port-note">{{ p.note }}</div>{% endif %}
+                            {% if p.raw.cves and p.raw.cves|length > 0 %}
+                            <div class="port-cves">
+                                <span class="text-muted text-small">CVEs:</span>
+                                {% for cve in p.raw.cves[:5] %}
+                                <a href="{{ cve.href }}" target="_blank" class="cve-link">{{ cve.id }}</a>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td><span class="risk-badge risk-{{ risk_key }}">{{ p.risk }}</span></td>
+                        <td>{{ p.recommendation }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-small">No open ports detected.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Fixed Vulnerabilities -->
+    {% if scan.fixed and scan.fixed|length > 0 %}
+    <div class="card mt-2" style="border:1px solid var(--success);">
+        <h3 style="color:var(--success);">✅ Remediated Vulnerabilities</h3>
+        <ul>
+            {% for fix in scan.fixed %}
+            <li style="padding:0.25rem 0; font-size:0.9rem;">{{ fix }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- All Alerts -->
+    <div class="card mt-2">
+        <h3>All Findings</h3>
+        <div class="search-bar">
+            <input type="text" id="alertSearch" placeholder="Search findings..." onkeyup="filterAlerts()">
+            <select id="riskFilter" onchange="filterAlerts()">
+                <option value="">All Risks</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+                <option value="Info">Info</option>
+            </select>
+        </div>
+        <div id="alertsList">
+            {% if scan.alerts %}
+            {% for a in scan.alerts %}
+            <div class="alert-item" style="border-bottom:1px solid var(--glass-border); padding:1rem 0;" data-risk="{{ a.risk }}" data-alert="{{ a.alert|lower }}">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="flex:1;">
+                        <strong>{{ a.alert }}</strong>
+                        {% if a.is_zero_day %}<span class="risk-badge risk-critical" style="margin-left:0.5rem;">⚠️ Zero-Day</span>{% endif %}
+                        <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem;">
+                            <span class="font-mono">{{ a.path }}</span>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="risk-badge risk-{{ (a.risk or 'info').lower() }}">{{ a.risk }}</span>
+                        {% if a.risk_score is defined %}
+                        <div style="font-size:0.7rem; color:var(--text-secondary); margin-top:2px;">Score: {{ a.risk_score }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if a.description %}
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0.5rem 0; line-height:1.5;">{{ a.description }}</p>
+                {% endif %}
+                {% if a.intel and a.intel|length > 0 %}
+                <div style="margin:0.5rem 0;">
+                    {% for f in a.intel %}
+                    <span style="font-size:0.65rem; background:rgba(239,68,68,0.2); color:#ef4444; padding:2px 6px; border-radius:10px; margin-right:5px;">{{ f }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div style="font-size:0.8rem; margin-top:0.5rem;">
+                    <strong>Solution:</strong> {{ a.solution or 'Refer to official security guidelines.' }}
+                </div>
+                {% if a.script %}
+                <div class="code-block">{{ a.script }}</div>
+                {% endif %}
+                {% if a.cves and a.cves|length > 0 %}
+                <div style="margin-top:0.5rem; font-size:0.75rem;">
+                    <strong>CVEs:</strong>
+                    {% for cve in a.cves %}
+                    <a href="{{ cve.href }}" target="_blank" style="margin-right:8px; color:var(--accent-primary);">{{ cve.id }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">No findings in this scan.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if scan.is_live %}
+<script>
+// Poll live scan progress
+const scanId = "{{ scan.scan_id }}";
+function pollLiveScan() {
+    fetch(`/status/${scanId}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('nmap_bar').style.width = (data.nmap || 0) + '%';
+            document.getElementById('nmap_bar').innerText = (data.nmap || 0) + '%';
+            document.getElementById('spider_bar').style.width = (data.spider || 0) + '%';
+            document.getElementById('spider_bar').innerText = (data.spider || 0) + '%';
+            document.getElementById('active_bar').style.width = (data.active || 0) + '%';
+            document.getElementById('active_bar').innerText = (data.active || 0) + '%';
+            document.getElementById('live_status').innerText = data.status;
+
+            if (["Completed", "Terminated", "Not Found"].includes(data.status) || data.status.includes("Failed")) {
+                clearInterval(window._pollInterval);
+                setTimeout(() => window.location.reload(), 2000);
+            }
+        });
+}
+window._pollInterval = setInterval(pollLiveScan, 1500);
+</script>
+{% endif %}
+
+<script>
+function filterAlerts() {
+    const search = document.getElementById('alertSearch').value.toLowerCase();
+    const risk = document.getElementById('riskFilter').value;
+    document.querySelectorAll('.alert-item').forEach(item => {
+        const matchesSearch = !search || item.dataset.alert.includes(search);
+        const matchesRisk = !risk || item.dataset.risk === risk;
+        item.style.display = matchesSearch && matchesRisk ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

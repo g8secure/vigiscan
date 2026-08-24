@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VigiScan{% endblock %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body data-user-lang="{{ user_lang or 'en' }}">
+
+    <!-- ================= SIDEBAR NAV ================= -->
+    <nav class="nav" id="sidebarNav">
+        <div class="nav-logo">
+            <div class="nav-logo-icon"><i class="fas fa-shield-alt"></i></div>
+            <div class="nav-logo-text">VigiScan</div>
+        </div>
+
+        <a href="/dashboard" class="nav-btn {% if active_page == 'dashboard' %}active{% endif %}">
+            <i class="fas fa-th-large"></i> <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="/assets" class="nav-btn {% if active_page == 'assets' %}active{% endif %}">
+            <i class="fas fa-server"></i> <span class="nav-text">Assets</span>
+        </a>
+        <a href="/scans" class="nav-btn {% if active_page == 'scans' %}active{% endif %}">
+            <i class="fas fa-search"></i> <span class="nav-text">Scans</span>
+        </a>
+        <a href="/history-page" class="nav-btn {% if active_page == 'history' %}active{% endif %}">
+            <i class="fas fa-history"></i> <span class="nav-text">History</span>
+        </a>
+        <a href="/vulnerabilities" class="nav-btn {% if active_page == 'vulnerabilities' %}active{% endif %}">
+            <i class="fas fa-bug"></i> <span class="nav-text">Vulnerabilities</span>
+        </a>
+        <a href="/reports" class="nav-btn {% if active_page == 'reports' %}active{% endif %}">
+            <i class="fas fa-file-alt"></i> <span class="nav-text">Reports</span>
+        </a>
+        <a href="/schedules" class="nav-btn {% if active_page == 'schedules' %}active{% endif %}">
+            <i class="fas fa-calendar-alt"></i> <span class="nav-text">Scheduled Scans</span>
+        </a>
+        <a href="/risk" class="nav-btn {% if active_page == 'risk' %}active{% endif %}">
+            <i class="fas fa-chart-line"></i> <span class="nav-text">Risk Management</span>
+        </a>
+        <a href="/knowledge-base" class="nav-btn {% if active_page == 'knowledge' %}active{% endif %}">
+            <i class="fas fa-book"></i> <span class="nav-text">Knowledge Base</span>
+        </a>
+
+        <div class="nav-footer">
+            {% if session.get('is_admin') %}
+            <a href="/admin" class="nav-btn {% if active_page == 'admin' %}active{% endif %}">
+                <i class="fas fa-cog"></i> <span class="nav-text">Administration</span>
+            </a>
+            {% endif %}
+            <a href="/settings" class="nav-btn {% if active_page == 'settings' %}active{% endif %}">
+                <i class="fas fa-user-cog"></i> <span class="nav-text">Settings</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- ================= MAIN WRAPPER ================= -->
+    <div class="main-wrapper">
+        <!-- ================= HEADER ================= -->
+        <header class="header">
+            <div class="header-btns">
+                <div class="dropdown">
+                    <button class="glass-btn">
+                        <i class="fas fa-plus-circle"></i> <span>NEW SCAN</span> <i class="fas fa-chevron-down" style="font-size:0.6rem; opacity:0.8;"></i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="/scans"><i class="fas fa-search"></i> New Vulnerability Scan</a>
+                        <a href="/scans?type=authenticated"><i class="fas fa-key"></i> Authenticated Scan</a>
+                        <a href="/schedules"><i class="fas fa-calendar-alt"></i> Schedule Recurring Scan</a>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="glass-btn">
+                        <i class="fas fa-file-alt"></i> <span>Reports</span> <i class="fas fa-chevron-down" style="font-size:0.6rem; opacity:0.8;"></i>
+                    </button>
+                    <div class="dropdown-content">
+                        <a href="/reports"><i class="fas fa-file-pdf"></i> Report Center</a>
+                        <a href="/reports?type=pdf"><i class="fas fa-file-pdf"></i> Download PDF</a>
+                        <a href="/reports?type=html"><i class="fas fa-file-code"></i> Download HTML</a>
+                        <a href="/reports?type=excel"><i class="fas fa-file-excel"></i> Export Excel</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="user-box">
+                <div class="dropdown" id="langDropdown">
+                    <button class="glass-btn" id="langBtn">
+                        <i class="fas fa-globe"></i> <span id="langBtnText">English (US)</span> <i class="fas fa-chevron-down" style="font-size:0.6rem; opacity:0.8;"></i>
+                    </button>
+                    <div class="dropdown-content" style="right:0;">
+                        <a href="#" onclick="setLang('en'); return false;"><i class="fas fa-language"></i> English (US)</a>
+                        <a href="#" onclick="setLang('uk_en'); return false;"><i class="fas fa-language"></i> English (UK)</a>
+                        <a href="#" onclick="setLang('es'); return false;"><i class="fas fa-language"></i> Español</a>
+                        <a href="#" onclick="setLang('fr'); return false;"><i class="fas fa-language"></i> Français</a>
+                        <a href="#" onclick="setLang('zh-CN'); return false;"><i class="fas fa-language"></i> 简体中文</a>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="glass-btn" style="padding:0.5rem 0.8rem; position:relative;">
+                        <i class="fas fa-bell"></i>
+                        <span id="notifBadge" style="display:none; position:absolute; top:-5px; right:-5px; background:#ef4444; color:white; border-radius:50%; width:18px; height:18px; font-size:0.6rem; display:flex; align-items:center; justify-content:center; font-weight:bold;"></span>
+                    </button>
+                    <div class="dropdown-content" id="notifList" style="min-width:300px; padding:0.5rem; right:0;">
+                        <p style="font-size:0.8rem; color:var(--text-secondary); padding:0.5rem;">Loading...</p>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="glass-btn">
+                        <i class="fas fa-user-circle" style="font-size:1.2rem;"></i> {{ session.get('user') or 'Guest' }}
+                        <i class="fas fa-chevron-down" style="font-size:0.7rem;"></i>
+                    </button>
+                    <div class="dropdown-content" style="right:0;">
+                        <a href="/profile"><i class="fas fa-id-badge"></i> User Profile</a>
+                        <a href="/settings"><i class="fas fa-cog"></i> Settings</a>
+                        {% if session.get('is_admin') %}
+                        <a href="/admin"><i class="fas fa-shield-alt"></i> Admin Panel</a>
+                        {% endif %}
+                        <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Log Out</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ================= FLASH MESSAGES ================= -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-container">
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}"><i class="fas fa-info-circle"></i> {{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <!-- ================= PAGE CONTENT ================= -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Google Translate Script -->
+    <div id="google_translate_element" style="display:none;"></div>
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({ pageLanguage: 'en' }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+    <style>
+        .VIpgJd-ZVi9od-ORHb-OEVmcd { display: none !important; }
+        .goog-te-banner-frame { display: none !important; }
+        body { top: 0 !important; }
+    </style>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

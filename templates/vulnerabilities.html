@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Vulnerabilities - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Vulnerabilities</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Vulnerability Lifecycle Tracker</h1>
+            <p class="page-subtitle">Track, manage, and remediate security vulnerabilities across your assets</p>
+        </div>
+        <a href="/risk" class="btn btn-secondary"><i class="fas fa-chart-line"></i> Risk Management</a>
+    </div>
+
+    <!-- Filters -->
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="vulnSearch" placeholder="Search vulnerabilities..." onkeyup="loadVulnerabilities()">
+            <select id="severityFilter" onchange="loadVulnerabilities()">
+                <option value="">All Severities</option>
+                <option value="Critical" {% if filter_severity == 'Critical' %}selected{% endif %}>Critical</option>
+                <option value="High" {% if filter_severity == 'High' %}selected{% endif %}>High</option>
+                <option value="Medium" {% if filter_severity == 'Medium' %}selected{% endif %}>Medium</option>
+                <option value="Low" {% if filter_severity == 'Low' %}selected{% endif %}>Low</option>
+            </select>
+            <select id="statusFilter" onchange="loadVulnerabilities()">
+                <option value="">All Statuses</option>
+                <option value="Open" {% if filter_status == 'Open' %}selected{% endif %}>Open</option>
+                <option value="In Progress" {% if filter_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                <option value="Resolved" {% if filter_status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                <option value="Accepted Risk" {% if filter_status == 'Accepted Risk' %}selected{% endif %}>Accepted Risk</option>
+            </select>
+            <span class="text-muted text-small" id="vulnCount"></span>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vulnerability</th>
+                        <th>Asset</th>
+                        <th>Severity</th>
+                        <th>Risk Score</th>
+                        <th>Status</th>
+                        <th>Found</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="vulnTrackerBody">
+                    <tr><td colspan="7" class="empty-state">Loading vulnerabilities...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadVulnerabilities);
+
+function loadVulnerabilities() {
+    const search = document.getElementById('vulnSearch').value.toLowerCase();
+    const severity = document.getElementById('severityFilter').value;
+    const status = document.getElementById('statusFilter').value;
+
+    fetch('/api/vulnerabilities')
+        .then(res => res.json())
+        .then(data => {
+            let filtered = data;
+            if (severity) filtered = filtered.filter(v => v.risk === severity);
+            if (status) filtered = filtered.filter(v => v.status === status);
+            if (search) filtered = filtered.filter(v => v.alert.toLowerCase().includes(search));
+
+            document.getElementById('vulnCount').innerText = `(${filtered.length} of ${data.length} shown)`;
+
+            const body = document.getElementById('vulnTrackerBody');
+            if (filtered.length === 0) {
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">No vulnerabilities match your filters.</td></tr>';
+                return;
+            }
+            body.innerHTML = filtered.map(v => {
+                let compTags = '';
+                try {
+                    const tags = JSON.parse(v.compliance_tags || '[]');
+                    compTags = tags.map(t => `<span style="font-size:0.6rem; border:1px solid var(--accent-secondary); padding:1px 4px; border-radius:4px; margin-right:4px;">${t}</span>`).join('');
+                } catch (e) {}
+
+                return `
+                <tr class="clickable" onclick="window.location='/vulnerabilities/${v.id}'">
+                    <td>
+                        <strong>${v.alert}</strong>
+                        <div style="margin-top:4px;">${compTags}</div>
+                    </td>
+                    <td>${v.asset_name || 'N/A'}</td>
+                    <td><span class="risk-badge risk-${(v.risk||'info').toLowerCase()}">${v.risk}</span></td>
+                    <td><span class="risk-badge risk-${(v.risk||'info').toLowerCase()}">${v.risk_score}</span></td>
+                    <td>${statusBadge(v.status)}</td>
+                    <td>${v.date_found ? v.date_found.split('T')[0] : 'N/A'}</td>
+                    <td onclick="event.stopPropagation()">
+                        <a href="/vulnerabilities/${v.id}" class="btn-link"><i class="fas fa-eye"></i> View</a>
+                    </td>
+                </tr>
+            `}).join('');
+        });
+}
+</script>
+{% endblock %}

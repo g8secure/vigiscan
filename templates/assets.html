@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Assets - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Assets</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Asset Inventory</h1>
+            <p class="page-subtitle">Manage and track all your organization's assets</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAddAsset()"><i class="fas fa-plus"></i> Add Asset</button>
+    </div>
+
+    <!-- ADD ASSET MODAL -->
+    <div id="addAssetModal" class="modal">
+        <div class="modal-header">
+            <h3>➕ Add New Asset</h3>
+            <button class="modal-close" onclick="closeAddAsset()">&times;</button>
+        </div>
+        <input type="text" id="asset_name" placeholder="Asset Name (e.g. Primary Web Server)">
+        <input type="text" id="asset_target" placeholder="IP or Domain (e.g. 192.168.1.1 or example.com)">
+        <label>Environment</label>
+        <select id="asset_env">
+            <option value="Production">Production</option>
+            <option value="Staging">Staging</option>
+            <option value="Development">Development</option>
+        </select>
+        <label>Criticality</label>
+        <select id="asset_criticality">
+            <option value="Low">Low</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+        </select>
+        <label class="form-check">
+            <input type="checkbox" id="asset_internet"> Internet Facing
+        </label>
+        <div class="modal-actions">
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmAddAsset()">Add Asset</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeAddAsset()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- EDIT ASSET MODAL -->
+    <div id="editAssetModal" class="modal">
+        <div class="modal-header">
+            <h3>✏️ Edit Asset</h3>
+            <button class="modal-close" onclick="closeEditAsset()">&times;</button>
+        </div>
+        <input type="hidden" id="edit_asset_id">
+        <input type="text" id="edit_asset_name" placeholder="Asset Name">
+        <input type="text" id="edit_asset_target" placeholder="IP or Domain">
+        <label>Environment</label>
+        <select id="edit_asset_env">
+            <option value="Production">Production</option>
+            <option value="Staging">Staging</option>
+            <option value="Development">Development</option>
+        </select>
+        <label>Criticality</label>
+        <select id="edit_asset_criticality">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+        </select>
+        <label class="form-check">
+            <input type="checkbox" id="edit_asset_internet"> Internet Facing
+        </label>
+        <div class="modal-actions">
+            <button class="btn btn-primary" style="flex:1;" onclick="confirmEditAsset()">Save Changes</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeEditAsset()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- ASSETS TABLE -->
+    <div class="card">
+        <h3>All Assets <span class="text-muted text-small" id="assetCount"></span></h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>IP / Domain</th>
+                        <th>Environment</th>
+                        <th>Criticality</th>
+                        <th>Exposure</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="assetBody">
+                    <tr><td colspan="6" class="empty-state">Loading assets...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadAssets() {
+    fetch("/api/assets")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("assetCount").innerText = `(${data.length} total)`;
+            const body = document.getElementById("assetBody");
+            if (data.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="empty-state">No assets recorded yet. Click "Add Asset" to get started.</td></tr>';
+                return;
+            }
+            body.innerHTML = data.map(a => `
+                <tr class="clickable" onclick="window.location='/assets/${a.id}'">
+                    <td><strong>${a.name}</strong></td>
+                    <td class="font-mono">${a.target}</td>
+                    <td><span class="risk-badge risk-info">${a.environment}</span></td>
+                    <td><span class="risk-badge risk-${a.criticality.toLowerCase()}">${a.criticality}</span></td>
+                    <td>${a.internet_facing ? '🌐 External' : '🔒 Internal'}</td>
+                    <td onclick="event.stopPropagation()">
+                        <a href="/assets/${a.id}" class="btn-link" title="View Details"><i class="fas fa-eye"></i></a>
+                        <button class="btn-link" onclick="openEditAsset(${a.id})" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button class="btn-link" style="color:#ef4444;" onclick="deleteAsset(${a.id})" title="Delete"><i class="fas fa-trash"></i></button>
+                        <a href="/scans?target=${encodeURIComponent(a.target)}" class="btn-link" title="Scan Asset"><i class="fas fa-play"></i></a>
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function openAddAsset() {
+    document.getElementById("addAssetModal").style.display = "block";
+}
+
+function closeAddAsset() {
+    document.getElementById("addAssetModal").style.display = "none";
+}
+
+function confirmAddAsset() {
+    const data = {
+        name: document.getElementById("asset_name").value,
+        target: document.getElementById("asset_target").value,
+        env: document.getElementById("asset_env").value,
+        criticality: document.getElementById("asset_criticality").value,
+        internet: document.getElementById("asset_internet").checked
+    };
+    if (!data.name || !data.target) return alert("Name and Target required");
+    axios.post("/api/admin/add_asset", data)
+        .then(res => {
+            closeAddAsset();
+            loadAssets();
+            document.getElementById("asset_name").value = '';
+            document.getElementById("asset_target").value = '';
+        })
+        .catch(err => alert("Failed to add asset"));
+}
+
+function openEditAsset(id) {
+    fetch(`/api/asset/${id}`)
+        .then(res => res.json())
+        .then(a => {
+            document.getElementById("edit_asset_id").value = a.id;
+            document.getElementById("edit_asset_name").value = a.name;
+            document.getElementById("edit_asset_target").value = a.ip || a.domain || '';
+            document.getElementById("edit_asset_env").value = a.environment;
+            document.getElementById("edit_asset_criticality").value = a.criticality;
+            document.getElementById("edit_asset_internet").checked = a.is_internet_facing;
+            document.getElementById("editAssetModal").style.display = "block";
+        });
+}
+
+function closeEditAsset() {
+    document.getElementById("editAssetModal").style.display = "none";
+}
+
+function confirmEditAsset() {
+    const id = document.getElementById("edit_asset_id").value;
+    const data = {
+        name: document.getElementById("edit_asset_name").value,
+        target: document.getElementById("edit_asset_target").value,
+        env: document.getElementById("edit_asset_env").value,
+        criticality: document.getElementById("edit_asset_criticality").value,
+        internet: document.getElementById("edit_asset_internet").checked
+    };
+    axios.put(`/api/asset/${id}`, data)
+        .then(res => {
+            closeEditAsset();
+            loadAssets();
+        })
+        .catch(err => alert("Failed to update asset"));
+}
+
+function deleteAsset(id) {
+    if (!confirm("Remove this asset?")) return;
+    axios.delete(`/api/admin/delete_asset/${id}`)
+        .then(() => loadAssets());
+}
+
+document.addEventListener('DOMContentLoaded', loadAssets);
+</script>
+{% endblock %}

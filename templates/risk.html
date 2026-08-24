@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Risk Management - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Risk Management</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Risk Management</h1>
+            <p class="page-subtitle">AI-powered risk scoring and vulnerability prioritization</p>
+        </div>
+    </div>
+
+    <!-- Risk Overview -->
+    <div class="stats-grid" id="riskOverviewGrid">
+        <a href="/vulnerabilities?severity=Critical" class="stat-card"><div class="stat-icon">🚨</div><div class="stat-value" id="risk-critical">0</div><div class="stat-label">Critical</div></a>
+        <a href="/vulnerabilities?severity=High" class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-value" id="risk-high">0</div><div class="stat-label">High</div></a>
+        <a href="/vulnerabilities?severity=Medium" class="stat-card"><div class="stat-icon">🔶</div><div class="stat-value" id="risk-medium">0</div><div class="stat-label">Medium</div></a>
+        <a href="/vulnerabilities?severity=Low" class="stat-card"><div class="stat-icon">🟢</div><div class="stat-value" id="risk-low">0</div><div class="stat-label">Low</div></a>
+    </div>
+
+    <div class="grid-2">
+        <!-- Risk by Asset -->
+        <div class="card" style="margin:0;">
+            <h3>Risk by Asset</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Asset</th><th>Vulns</th><th>Total Risk</th></tr></thead>
+                    <tbody id="riskAssetBody"><tr><td colspan="3" class="empty-state">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Highest Risk Vulns -->
+        <div class="card" style="margin:0;">
+            <h3>Highest Risk Vulnerabilities</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Vulnerability</th><th>Asset</th><th>Score</th></tr></thead>
+                    <tbody id="topRiskVulnsBody"><tr><td colspan="3" class="empty-state">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Risk Assessment Tool -->
+    <div class="card mt-2">
+        <h3>🤖 AI Risk Assessment</h3>
+        <p class="text-muted mb-2">Use our intelligent risk scoring model to evaluate vulnerability severity.</p>
+        <div class="grid-2">
+            <div style="background:var(--bg-secondary); padding:1.5rem; border-radius:1rem; border:1px solid var(--glass-border);">
+                <label>Vulnerability Type</label>
+                <select id="vulnType">
+                    <option value="sql-injection">SQL Injection</option>
+                    <option value="xss">Cross-Site Scripting (XSS)</option>
+                    <option value="rce">Remote Code Execution</option>
+                    <option value="auth-bypass">Authentication Bypass</option>
+                    <option value="data-leak">Data Leakage</option>
+                    <option value="dos">Denial of Service</option>
+                </select>
+                <label>CVSS Base Score (0-10)</label>
+                <input type="number" id="cvssScore" min="0" max="10" step="0.1" placeholder="7.5">
+                <label>Asset Criticality</label>
+                <select id="assetCriticality">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+                <label>Threat Intelligence Level</label>
+                <select id="threatLevel">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="extreme">Extreme</option>
+                </select>
+                <button class="btn btn-primary" style="width:100%;" onclick="calculateAIRisk()">🔍 Calculate AI Risk Score</button>
+            </div>
+            <div style="background:var(--bg-secondary); padding:1.5rem; border-radius:1rem; border:1px solid var(--glass-border);">
+                <h4 style="margin-top:0; color:var(--accent-primary);">AI Risk Assessment Result</h4>
+                <div id="aiRiskResult" style="text-align:center; padding:2rem;">
+                    <div style="font-size:3rem; margin-bottom:1rem;">🤖</div>
+                    <p class="text-muted">Enter vulnerability details and click "Calculate AI Risk Score" to get an intelligent risk assessment.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Risk Trends -->
+    <div class="card mt-2">
+        <h3>📈 Vulnerability Trends</h3>
+        <div class="chart-container" style="height:250px;">
+            <canvas id="riskTrendChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadRiskOverview();
+    loadTrends();
+});
+
+function loadRiskOverview() {
+    fetch('/api/risk/overview')
+        .then(res => res.json())
+        .then(data => {
+            const sev = data.by_severity || {};
+            document.getElementById('risk-critical').innerText = sev.Critical || 0;
+            document.getElementById('risk-high').innerText = sev.High || 0;
+            document.getElementById('risk-medium').innerText = sev.Medium || 0;
+            document.getElementById('risk-low').innerText = sev.Low || 0;
+
+            const assetBody = document.getElementById('riskAssetBody');
+            if (data.by_asset && data.by_asset.length > 0) {
+                assetBody.innerHTML = data.by_asset.map(a => `
+                    <tr class="clickable" onclick="window.location='/assets/${a.id}'">
+                        <td><strong>${a.name}</strong></td><td>${a.count}</td><td><span class="risk-badge ${a.risk > 50 ? 'risk-high' : a.risk > 25 ? 'risk-medium' : 'risk-low'}">${a.risk}</span></td>
+                    </tr>
+                `).join('');
+            } else {
+                assetBody.innerHTML = '<tr><td colspan="3" class="empty-state">No asset risk data.</td></tr>';
+            }
+
+            const topBody = document.getElementById('topRiskVulnsBody');
+            if (data.highest_risk && data.highest_risk.length > 0) {
+                topBody.innerHTML = data.highest_risk.map(v => `
+                    <tr class="clickable" onclick="window.location='/vulnerabilities/${v.id}'">
+                        <td><strong>${v.name}</strong></td><td>${v.asset || 'N/A'}</td>
+                        <td><span class="risk-badge risk-${(v.severity||'info').toLowerCase()}">${v.risk_score}</span></td>
+                    </tr>
+                `).join('');
+            } else {
+                topBody.innerHTML = '<tr><td colspan="3" class="empty-state">No vulnerabilities.</td></tr>';
+            }
+        });
+}
+
+function loadTrends() {
+    fetch('/api/trends')
+        .then(res => res.json())
+        .then(data => {
+            const ctx = document.getElementById('riskTrendChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [
+                        { label: 'High', data: data.map(d => d.high), borderColor: '#ef4444', tension: 0.3, fill: false },
+                        { label: 'Medium', data: data.map(d => d.medium), borderColor: '#f59e0b', tension: 0.3, fill: false },
+                        { label: 'Low', data: data.map(d => d.low), borderColor: '#22c55e', tension: 0.3, fill: false }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        });
+}
+
+function calculateAIRisk() {
+    const vulnType = document.getElementById('vulnType').value;
+    const cvssScore = parseFloat(document.getElementById('cvssScore').value);
+    const assetCriticality = document.getElementById('assetCriticality').value;
+    const threatLevel = document.getElementById('threatLevel').value;
+
+    if (!cvssScore || cvssScore < 0 || cvssScore > 10) {
+        alert('Please enter a valid CVSS score between 0 and 10');
+        return;
+    }
+
+    let score = cvssScore;
+    const vulnMult = { 'sql-injection': 1.2, 'xss': 1.1, 'rce': 1.5, 'auth-bypass': 1.4, 'data-leak': 1.3, 'dos': 1.0 };
+    const critMult = { 'low': 0.7, 'medium': 1.0, 'high': 1.3, 'critical': 1.5 };
+    const threatMult = { 'low': 0.8, 'medium': 1.0, 'high': 1.2, 'extreme': 1.4 };
+
+    score *= (vulnMult[vulnType] || 1.0);
+    score *= (critMult[assetCriticality] || 1.0);
+    score *= (threatMult[threatLevel] || 1.0);
+    const finalScore = Math.min(Math.max(score, 0), 10);
+
+    let riskLevel, riskColor, riskIcon;
+    if (finalScore >= 8.5) { riskLevel = 'Critical'; riskColor = '#ef4444'; riskIcon = '🚨'; }
+    else if (finalScore >= 7.0) { riskLevel = 'High'; riskColor = '#f59e0b'; riskIcon = '⚠️'; }
+    else if (finalScore >= 4.0) { riskLevel = 'Medium'; riskColor = '#3b82f6'; riskIcon = 'ℹ️'; }
+    else { riskLevel = 'Low'; riskColor = '#22c55e'; riskIcon = '✅'; }
+
+    document.getElementById('aiRiskResult').innerHTML = `
+        <div style="font-size:4rem; margin-bottom:1rem;">${riskIcon}</div>
+        <div style="font-size:3rem; font-weight:900; color:${riskColor}; margin-bottom:0.5rem;">${finalScore.toFixed(1)}</div>
+        <div style="font-size:1.5rem; font-weight:700; color:${riskColor}; margin-bottom:1rem;">${riskLevel} Risk</div>
+        <div style="background:var(--bg-primary); padding:1rem; border-radius:0.5rem; border:1px solid var(--glass-border);">
+            <div style="display:flex; justify-content:space-between;"><span>Type:</span><span style="font-weight:600;">${vulnType.replace('-', ' ').toUpperCase()}</span></div>
+            <div style="display:flex; justify-content:space-between; margin-top:0.5rem;"><span>CVSS:</span><span style="font-weight:600;">${cvssScore}</span></div>
+            <div style="display:flex; justify-content:space-between; margin-top:0.5rem;"><span>Asset:</span><span style="font-weight:600;">${assetCriticality.toUpperCase()}</span></div>
+            <div style="display:flex; justify-content:space-between; margin-top:0.5rem;"><span>Threat:</span><span style="font-weight:600;">${threatLevel.toUpperCase()}</span></div>
+        </div>
+    `;
+}
+</script>
+{% endblock %}

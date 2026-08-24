@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Knowledge Base - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Knowledge Base</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Knowledge Base</h1>
+            <p class="page-subtitle">Security intelligence, remediation guidance, and platform documentation</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateArticle()"><i class="fas fa-plus"></i> New Article</button>
+    </div>
+
+    <!-- Hero -->
+    <div class="help-hero">
+        <h1 style="font-size:2.5rem; margin-bottom:0.5rem;">How can we help?</h1>
+        <p style="font-size:1.1rem; opacity:0.9;">Search our knowledge base or browse categories below</p>
+        <div class="help-search-container">
+            <i class="fas fa-search" style="position:absolute; left:1.5rem; top:50%; transform:translateY(-50%); font-size:1.2rem; color:rgba(255,255,255,0.7);"></i>
+            <input type="text" class="help-search-input" placeholder="Search for vulnerabilities, remediation, or tips..." id="kbSearch" onkeyup="filterKnowledgeBase()">
+        </div>
+    </div>
+
+    <!-- Category Grid -->
+    <div class="kb-category-grid" id="kbCategoryGrid">
+        <a class="kb-category-card" onclick="switchKBCategory('web-vulns')">
+            <div class="kb-category-icon"><i class="fas fa-globe"></i></div>
+            <div class="kb-category-title">Web Security</div>
+            <div class="kb-category-desc">Learn about XSS, SQLi, CSRF and how to defend modern web apps.</div>
+        </a>
+        <a class="kb-category-card" onclick="switchKBCategory('network-ports')">
+            <div class="kb-category-icon"><i class="fas fa-network-wired"></i></div>
+            <div class="kb-category-title">Network Defense</div>
+            <div class="kb-category-desc">Identifying open ports, service vulnerabilities, and hardening infrastructure.</div>
+        </a>
+        <a class="kb-category-card" onclick="switchKBCategory('severity-guide')">
+            <div class="kb-category-icon"><i class="fas fa-shield-virus"></i></div>
+            <div class="kb-category-title">Severity Guide</div>
+            <div class="kb-category-desc">Understanding CVSS scores and how we prioritize risks.</div>
+        </a>
+        <a class="kb-category-card" onclick="switchKBCategory('fix-guide')">
+            <div class="kb-category-icon"><i class="fas fa-tools"></i></div>
+            <div class="kb-category-title">Remediation</div>
+            <div class="kb-category-desc">Step-by-step guides for fixing critical security vulnerabilities.</div>
+        </a>
+        <a class="kb-category-card" onclick="switchKBCategory('about')">
+            <div class="kb-category-icon"><i class="fas fa-info-circle"></i></div>
+            <div class="kb-category-title">Platform Docs</div>
+            <div class="kb-category-desc">General usage, integration guides, and system overview.</div>
+        </a>
+    </div>
+
+    <!-- KB Content -->
+    <div id="kb-content-container" class="card" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem;">
+            <h3 id="kb-category-display-title">Articles</h3>
+            <button class="btn btn-secondary" onclick="backToCategories()">← Back to categories</button>
+        </div>
+        <div id="kb-content"><!-- Content loaded dynamically --></div>
+    </div>
+
+    <!-- CVE Search -->
+    <div class="card mt-2">
+        <h3>🔍 CVE / NVD Search</h3>
+        <p class="text-muted text-small">Search for known vulnerabilities by product name or CVE ID.</p>
+        <div class="search-bar">
+            <input type="text" id="cveSearchInput" placeholder="Search CVE (e.g. Apache, nginx, CVE-2021-44228)">
+            <button class="btn btn-primary" onclick="searchCVE()"><i class="fas fa-search"></i> Search</button>
+        </div>
+        <div id="cveResults" class="mt-1">
+            <div class="empty-state">Enter a search term to find CVE information.</div>
+        </div>
+    </div>
+
+    <!-- MITRE ATT&CK -->
+    <div class="card">
+        <h3>🛡️ MITRE ATT&CK Framework</h3>
+        <p class="text-muted text-small">Common MITRE ATT&CK techniques relevant to detected vulnerabilities.</p>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Technique ID</th>
+                        <th>Name</th>
+                        <th>Tactic</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="font-mono">T1190</td><td>Exploit Public-Facing Application</td><td>Initial Access</td><td>Attackers exploit vulnerabilities in internet-facing systems</td></tr>
+                    <tr><td class="font-mono">T1059.007</td><td>JavaScript</td><td>Execution</td><td>Adversaries may use JavaScript for execution</td></tr>
+                    <tr><td class="font-mono">T1078</td><td>Valid Accounts</td><td>Defense Evasion</td><td>Adversaries may use valid credentials</td></tr>
+                    <tr><td class="font-mono">T1046</td><td>Network Service Discovery</td><td>Discovery</td><td>Scanning for open ports and services</td></tr>
+                    <tr><td class="font-mono">T1548</td><td>Abuse Elevation Control Mechanism</td><td>Privilege Escalation</td><td>Exploiting configuration weaknesses</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE ARTICLE MODAL -->
+<div id="createArticleModal" class="modal">
+    <div class="modal-header">
+        <h3>📝 Create Knowledge Base Article</h3>
+        <button class="modal-close" onclick="closeCreateArticle()">&times;</button>
+    </div>
+    <input type="text" id="articleTitle" placeholder="Article Title">
+    <select id="articleCategory">
+        <option value="Vulnerabilities">Vulnerabilities</option>
+        <option value="Remediation">Remediation</option>
+        <option value="Best Practices">Best Practices</option>
+        <option value="Compliance">Compliance</option>
+        <option value="Tools">Tools</option>
+    </select>
+    <textarea id="articleContent" placeholder="Article content (supports Markdown)" rows="8"></textarea>
+    <input type="text" id="articleTags" placeholder="Tags (comma-separated)">
+    <label class="form-check"><input type="checkbox" id="articlePublic" checked> Make Public</label>
+    <div class="modal-actions">
+        <button class="btn btn-primary" style="flex:1;" onclick="createArticle()">Create Article</button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="closeCreateArticle()">Cancel</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let kbData = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadKnowledgeBase();
+});
+
+function loadKnowledgeBase() {
+    fetch('/api/knowledge_base')
+        .then(res => res.json())
+        .then(data => {
+            kbData = data;
+        })
+        .catch(err => console.error('Error loading knowledge base:', err));
+}
+
+function switchKBCategory(category) {
+    document.getElementById('kb-content-container').style.display = 'block';
+    document.getElementById('kbCategoryGrid').style.display = 'none';
+
+    const categoryData = kbData[category];
+    if (!categoryData) return;
+
+    document.getElementById('kb-category-display-title').innerText = categoryData.name;
+
+    let html = "";
+    for (const [key, topic] of Object.entries(categoryData.topics)) {
+        html += `
+            <div class="kb-topic" onclick="toggleKBDetail('${category}', '${key}')">${topic.name}</div>
+            <div class="kb-detail" id="kb-detail-${category}-${key}">
+                <h4>${topic.name}</h4>
+                ${topic.description ? `<p><strong>Description:</strong> ${topic.description}</p>` : ''}
+                ${topic.how_it_happens ? `<p><strong>How it happens:</strong> ${topic.how_it_happens}</p>` : ''}
+                ${topic.impact ? `<p><strong>Impact:</strong> ${topic.impact}</p>` : ''}
+                ${topic.severity ? `<p><strong>Severity:</strong> ${topic.severity}</p>` : ''}
+                ${topic.risk_level ? `<p><strong>Risk Level:</strong> ${topic.risk_level}</p>` : ''}
+                ${topic.risk ? `<p><strong>Risk:</strong> ${topic.risk}</p>` : ''}
+                ${topic.recommendation ? `<p><strong>Recommendation:</strong> ${topic.recommendation}</p>` : ''}
+                ${topic.meaning ? `<p><strong>Meaning:</strong> ${topic.meaning}</p>` : ''}
+                ${topic.action ? `<p><strong>Action Required:</strong> ${topic.action}</p>` : ''}
+                ${topic.fix ? `<p><strong>Fix:</strong> ${topic.fix}</p>` : ''}
+                ${topic.recommended_fix ? `<p><strong>Recommended Fix:</strong> ${topic.recommended_fix}</p>` : ''}
+                ${topic.tools ? `<p><strong>Tools:</strong> ${topic.tools}</p>` : ''}
+                ${topic.steps ? `<p><strong>Steps:</strong> ${topic.steps}</p>` : ''}
+            </div>`;
+    }
+    document.getElementById('kb-content').innerHTML = html;
+}
+
+function backToCategories() {
+    document.getElementById('kb-content-container').style.display = 'none';
+    document.getElementById('kbCategoryGrid').style.display = 'grid';
+}
+
+function toggleKBDetail(category, topicKey) {
+    const detail = document.getElementById(`kb-detail-${category}-${topicKey}`);
+    if (detail.style.display === 'block') {
+        detail.style.display = 'none';
+    } else {
+        detail.style.display = 'block';
+    }
+}
+
+function filterKnowledgeBase() {
+    const searchTerm = document.getElementById('kbSearch').value.toLowerCase();
+    let url = '/api/knowledge_base/search?q=' + encodeURIComponent(searchTerm);
+    fetch(url)
+        .then(res => res.json())
+        .then(articles => {
+            // Show results in content container
+            if (articles.length > 0) {
+                document.getElementById('kb-content-container').style.display = 'block';
+                document.getElementById('kbCategoryGrid').style.display = 'none';
+                document.getElementById('kb-category-display-title').innerText = 'Search Results';
+                document.getElementById('kb-content').innerHTML = articles.map(a => `
+                    <div class="kb-topic" onclick="viewArticle(${a.id})">${a.title} <span class="text-muted text-small">(${a.category})</span></div>
+                `).join('') || '<p class="empty-state">No articles found.</p>';
+            }
+        });
+}
+
+function openCreateArticle() {
+    document.getElementById('createArticleModal').style.display = 'block';
+}
+
+function closeCreateArticle() {
+    document.getElementById('createArticleModal').style.display = 'none';
+    document.getElementById('articleTitle').value = '';
+    document.getElementById('articleContent').value = '';
+    document.getElementById('articleTags').value = '';
+    document.getElementById('articlePublic').checked = true;
+}
+
+function createArticle() {
+    const title = document.getElementById('articleTitle').value.trim();
+    const category = document.getElementById('articleCategory').value;
+    const content = document.getElementById('articleContent').value.trim();
+    const tags = document.getElementById('articleTags').value.split(',').map(t => t.trim()).filter(t => t);
+    const isPublic = document.getElementById('articlePublic').checked;
+
+    if (!title || !content) { alert('Title and content are required'); return; }
+
+    fetch('/api/knowledge_base', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, category, content, tags, is_public: isPublic })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.message) {
+            closeCreateArticle();
+            alert('Article created successfully!');
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Error creating article'));
+}
+
+function searchCVE() {
+    const query = document.getElementById('cveSearchInput').value.trim();
+    const resultsDiv = document.getElementById('cveResults');
+
+    if (!query) { resultsDiv.innerHTML = '<div class="empty-state">Enter a search term to find CVE information.</div>'; return; }
+
+    resultsDiv.innerHTML = '<div class="empty-state">Searching CVE database...</div>';
+
+    fetch('/api/cve/search?q=' + encodeURIComponent(query))
+        .then(res => res.json())
+        .then(data => {
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<div class="empty-state">No CVEs found for "' + query + '".</div>';
+                return;
+            }
+            resultsDiv.innerHTML = `
+                <table>
+                    <thead><tr><th>CVE ID</th><th>Title</th><th>CVSS</th><th>Link</th></tr></thead>
+                    <tbody>${data.map(c => `
+                        <tr><td class="font-mono">${c.id}</td><td>${c.title}</td><td>${c.cvss}</td><td><a href="${c.href}" target="_blank" class="btn-link">View</a></td></tr>
+                    `).join('')}</tbody>
+                </table>
+            `;
+        })
+        .catch(err => {
+            resultsDiv.innerHTML = '<div class="empty-state">Error searching CVE database.</div>';
+        });
+}
+
+function viewArticle(id) {
+    window.location.href = '/knowledge-base';
+}
+</script>
+{% endblock %}

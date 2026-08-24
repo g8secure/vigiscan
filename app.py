@@ -27,6 +27,27 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-insecure-key-change-me')
 app.permanent_session_lifetime = timedelta(minutes=10)
 
+# ================= JINJA2 TEMPLATE GLOBALS =================
+@app.template_global('statusBadge')
+def status_badge(status):
+    """Render a status badge span for a given status string."""
+    s = (status or 'Open').lower().replace(' ', '-')
+    return f'<span class="status-badge status-{s}">{status or "Open"}</span>'
+
+@app.template_global('riskBadge')
+def risk_badge(risk):
+    """Render a risk badge span for a given risk level string."""
+    r = (risk or 'Info').lower()
+    return f'<span class="risk-badge risk-{r}">{risk or "Info"}</span>'
+
+# Register a 'match' test so templates can use selectattr('x', 'match', 'regex')
+@app.template_test('match')
+def regex_match(value, pattern):
+    """Jinja test: check if a string matches a regex pattern."""
+    if value is None:
+        return False
+    return re.match(pattern, str(value)) is not None
+
 # ================= DATABASE PATH =================
 # On Render with a persistent disk mounted at /data, store the DB there.
 # Locally, falls back to the project directory.
@@ -167,6 +188,170 @@ KNOWLEDGE_BASE = {
         }
     }
 }
+
+# ================= OPEN PORTS & SERVICES INTERPRETATION =================
+# Risk is assigned to an open port ONLY when supported by the detected
+# service/version, configuration, or vulnerability intelligence. An open
+# port is attack surface, not a vulnerability. If the service cannot be
+# confidently identified, "Unknown / Requires Assessment" is displayed.
+PORT_KNOWLEDGE_BASE = {
+    21:    {"service": "FTP", "risk": "High", "recommendation": "Disable FTP or replace with SFTP/FTPS; restrict to trusted networks"},
+    22:    {"service": "SSH", "risk": "Medium", "recommendation": "Restrict to trusted networks; enforce key-based authentication"},
+    23:    {"service": "Telnet", "risk": "High", "recommendation": "Disable Telnet; use encrypted SSH instead"},
+    25:    {"service": "SMTP", "risk": "Medium", "recommendation": "Restrict to authorised mail relays; enable TLS and authentication"},
+    53:    {"service": "DNS", "risk": "Medium", "recommendation": "Restrict recursive queries; keep DNS software patched"},
+    80:    {"service": "HTTP", "risk": "Medium", "recommendation": "Redirect to HTTPS; restrict exposure to trusted networks"},
+    110:   {"service": "POP3", "risk": "Medium", "recommendation": "Replace with POP3S/IMAPS; restrict to trusted networks"},
+    111:   {"service": "RPC Bind", "risk": "Medium", "recommendation": "Restrict access; disable if not required"},
+    135:   {"service": "Microsoft Windows RPC", "risk": "Medium", "recommendation": "Restrict exposure to trusted networks"},
+    139:   {"service": "Microsoft Windows NetBIOS", "risk": "Medium", "recommendation": "Disable if not required"},
+    143:   {"service": "IMAP", "risk": "Medium", "recommendation": "Replace with IMAPS; restrict to trusted networks"},
+    389:   {"service": "LDAP", "risk": "Medium", "recommendation": "Use LDAPS; restrict to trusted networks"},
+    443:   {"service": "HTTPS", "risk": "Low", "recommendation": "Verify TLS configuration and certificate validity"},
+    445:   {"service": "Microsoft SMB", "risk": "High", "recommendation": "Verify SMB configuration and patch level",
+           "note": "SMB has a history of widely exploited vulnerabilities (e.g., MS17-010 / EternalBlue). Confirm the host is fully patched."},
+    512:   {"service": "rexec", "risk": "High", "recommendation": "Disable rexec; use SSH instead"},
+    513:   {"service": "rlogin", "risk": "High", "recommendation": "Disable rlogin; use SSH instead"},
+    514:   {"service": "rsh", "risk": "High", "recommendation": "Disable rsh; use SSH instead"},
+    873:   {"service": "rsync", "risk": "Low", "recommendation": "Restrict to trusted networks; enable authentication"},
+    902:   {"service": "VMware Authentication Daemon", "risk": "Medium", "recommendation": "Restrict access to management networks"},
+    912:   {"service": "VMware Authentication Daemon", "risk": "Medium", "recommendation": "Verify VMware service requirement"},
+    993:   {"service": "IMAPS", "risk": "Low", "recommendation": "Verify TLS configuration"},
+    995:   {"service": "POP3S", "risk": "Low", "recommendation": "Verify TLS configuration"},
+    1433:  {"service": "MSSQL", "risk": "High", "recommendation": "Restrict access; enforce strong authentication"},
+    1521:  {"service": "Oracle Database", "risk": "High", "recommendation": "Restrict access; apply latest security patches"},
+    2049:  {"service": "NFS", "risk": "Medium", "recommendation": "Restrict exports to trusted hosts"},
+    2375:  {"service": "Docker API", "risk": "High", "recommendation": "Do not expose the Docker socket publicly; require TLS"},
+    2376:  {"service": "Docker API (TLS)", "risk": "Low", "recommendation": "Restrict to trusted management hosts"},
+    3306:  {"service": "MySQL", "risk": "High", "recommendation": "Restrict access; enforce strong authentication"},
+    3389:  {"service": "Remote Desktop Protocol (RDP)", "risk": "High", "recommendation": "Restrict RDP; require VPN and MFA"},
+    5432:  {"service": "PostgreSQL", "risk": "High", "recommendation": "Restrict access; enforce strong authentication"},
+    5601:  {"service": "Kibana", "risk": "Medium", "recommendation": "Restrict access; enable authentication"},
+    5900:  {"service": "VNC", "risk": "High", "recommendation": "Disable VNC or tunnel over VPN; enforce strong passwords"},
+    5984:  {"service": "CouchDB", "risk": "Medium", "recommendation": "Restrict access; enforce authentication"},
+    6379:  {"service": "Redis", "risk": "High", "recommendation": "Restrict access; enable authentication"},
+    8080:  {"service": "HTTP Alt", "risk": "Medium", "recommendation": "Verify software and patch level; restrict exposure"},
+    8443:  {"service": "HTTPS Alt", "risk": "Low", "recommendation": "Verify TLS configuration and service identity"},
+    9200:  {"service": "Elasticsearch", "risk": "High", "recommendation": "Restrict access; enable authentication"},
+    11211: {"service": "Memcached", "risk": "High", "recommendation": "Restrict access; disable UDP; enable authentication"},
+    27017: {"service": "MongoDB", "risk": "High", "recommendation": "Restrict access; enable authentication"},
+    5000:  {"service": "Werkzeug HTTP Server", "risk": "Medium", "recommendation": "Avoid exposing development servers publicly"},
+    16992: {"service": "Intel AMT", "risk": "Medium", "recommendation": "Restrict management interface"},
+}
+
+# Product/service text profiles used when the detected product is confidently
+# identified from the Nmap alert text (takes precedence over the port map).
+SERVICE_RISK_PROFILES = [
+    {"keywords": ["werkzeug"], "service": "Werkzeug HTTP Server", "risk": "Medium", "recommendation": "Avoid exposing development servers publicly"},
+    {"keywords": ["vmware"], "service": "VMware Authentication Daemon", "risk": "Medium", "recommendation": "Restrict access to management networks"},
+    {"keywords": ["intel", "amt", "active management"], "service": "Intel AMT", "risk": "Medium", "recommendation": "Restrict management interface"},
+    {"keywords": ["microsoft-rpc", "msrpc", "microsoft windows rpc"], "service": "Microsoft Windows RPC", "risk": "Medium", "recommendation": "Restrict exposure to trusted networks"},
+    {"keywords": ["netbios", "netbios-ssn"], "service": "Microsoft Windows NetBIOS", "risk": "Medium", "recommendation": "Disable if not required"},
+    {"keywords": ["microsoft-ds", "smb", "samba"], "service": "Microsoft SMB", "risk": "High", "recommendation": "Verify SMB configuration and patch level",
+     "note": "SMB has a history of widely exploited vulnerabilities (e.g., MS17-010 / EternalBlue). Confirm the host is fully patched."},
+    {"keywords": ["rdp", "remote desktop"], "service": "Remote Desktop Protocol (RDP)", "risk": "High", "recommendation": "Restrict RDP; require VPN and MFA"},
+    {"keywords": ["ssh", "openssh"], "service": "SSH", "risk": "Medium", "recommendation": "Restrict to trusted networks; enforce key-based authentication"},
+    {"keywords": ["ftp"], "service": "FTP", "risk": "High", "recommendation": "Disable FTP or replace with SFTP/FTPS; restrict to trusted networks"},
+    {"keywords": ["telnet"], "service": "Telnet", "risk": "High", "recommendation": "Disable Telnet; use encrypted SSH instead"},
+]
+
+def lookup_port_profile(alert_text, port_num):
+    """Return the risk profile for a port, preferring the detected product text.
+
+    When the detected product text matches a known service profile AND the port
+    number has its own knowledge-base entry with the same service label, the
+    port-specific entry takes precedence so per-port recommendations (e.g. the
+    VMware daemon on 902 vs 912) are preserved.
+    """
+    text = (alert_text or "").lower()
+    port_profile = PORT_KNOWLEDGE_BASE.get(port_num)
+    for entry in SERVICE_RISK_PROFILES:
+        if any(kw in text for kw in entry["keywords"]):
+            # If the port has a specific, matching profile, honour its
+            # recommendation/note while keeping the confidently-identified
+            # service label from the matched text profile.
+            if port_profile and port_profile.get("service", "").lower() == entry["service"].lower():
+                merged = dict(entry)
+                merged["service"] = port_profile["service"]
+                merged["recommendation"] = port_profile["recommendation"]
+                if port_profile.get("note"):
+                    merged["note"] = port_profile["note"]
+                return merged
+            return entry
+    return port_profile
+
+def parse_port_entries(alerts):
+    """Parse existing Nmap port alerts into a structured port table.
+
+    Only data already produced by the scanner is used. No versions or
+    vulnerabilities are invented. Unknown services are reported as
+    'Unknown / Requires Assessment'.
+    """
+    ports = []
+    for a in alerts or []:
+        path = a.get("path") or ""
+        m = re.match(r'^Port\s+(\d+)/(tcp|udp)$', path, re.IGNORECASE)
+        if not m:
+            continue
+
+        port_num = int(m.group(1))
+        protocol = m.group(2).upper()
+        alert_text = a.get("alert") or ""
+        cves = a.get("cves") or []
+
+        # Existing alert format: "{product} {version} on port X"
+        #                     or: "Service on port X"
+        suffix = f" on port {port_num}"
+        product_text = alert_text[:-len(suffix)].strip() if alert_text.endswith(suffix) else alert_text.strip()
+        if not product_text or product_text.lower() in ("service", "unknown"):
+            product_text = None
+
+        # Service label: prefer confidently detected product profile, then the
+        # well-known port profile, then the raw product text, otherwise Unknown.
+        profile = lookup_port_profile(alert_text, port_num)
+        base_profile = PORT_KNOWLEDGE_BASE.get(port_num)
+
+        if profile:
+            service_label = profile["service"]
+        elif base_profile:
+            service_label = base_profile["service"]
+        elif product_text:
+            service_label = product_text
+        else:
+            service_label = "Unknown"
+
+        if profile:
+            risk = profile["risk"]
+            recommendation = profile["recommendation"]
+            note = profile.get("note")
+        elif cves:
+            # Vulnerability intelligence supports a risk assignment.
+            risk = "Medium"
+            recommendation = a.get("solution") or "Verify software version and apply required patches"
+            note = f"{len(cves)} known CVE reference(s) found for this service."
+        else:
+            risk = "Unknown / Requires Assessment"
+            recommendation = a.get("solution") or "Perform a manual assessment of this service before exposure decisions."
+            note = None
+
+        entry = {
+            "port": port_num,
+            "protocol": protocol,
+            "service": service_label,
+            "risk": risk,
+            "recommendation": recommendation,
+            "raw": {
+                "path": path,
+                "alert": alert_text,
+                "description": a.get("description", ""),
+                "solution": a.get("solution", ""),
+                "cves": cves
+            }
+        }
+        if note:
+            entry["note"] = note
+        ports.append(entry)
+    return ports
 
 # ================= DATABASE =================
 def init_db():
@@ -539,7 +724,7 @@ def dashboard():
         except:
             pass
 
-    return render_template("dashboard.html", user=session.get("user", "Guest"), user_lang=user_lang)
+    return render_template("dashboard.html", user=session.get("user", "Guest"), user_lang=user_lang, active_page="dashboard")
 
 @app.route('/api/save_language', methods=['POST'])
 @login_required
@@ -579,7 +764,7 @@ def profile():
     if not user:
         return "User not found", 404
 
-    return render_template("profile.html", username=user[0], role="Admin" if user[1] else "User")
+    return render_template("profile.html", username=user[0], role="Admin" if user[1] else "User", user_lang=get_user_lang(), active_page="settings")
 
 @app.route('/logout')
 @login_required
@@ -641,7 +826,7 @@ def get_audit_logs():
 @app.route('/admin')
 @admin_required
 def admin_panel():
-    return render_template("admin.html", user=session.get("user"))
+    return render_template("admin.html", user=session.get("user"), user_lang=get_user_lang(), active_page="admin")
 
 
 @app.route('/admin/users')
@@ -1167,9 +1352,17 @@ def send_realtime_alert(user, target, risk, alert_name):
     pass
 
 # ================= SCAN SYSTEM =================
+# ZAP daemon connection settings (overridable via environment variables).
+# Defaults match the container setup in start.sh (ZAP on 127.0.0.1:8080).
+ZAP_HOST = os.environ.get("ZAP_HOST", "127.0.0.1")
+ZAP_PORT = int(os.environ.get("ZAP_PORT", "8080"))
+ZAP_API_KEY = os.environ.get("ZAP_API_KEY", "")
 zap = ZAPv2(
-    apikey='',
-    proxies={'http':'http://127.0.0.1:8080','https':'http://127.0.0.1:8080'}
+    apikey=ZAP_API_KEY,
+    proxies={
+        'http': f'http://{ZAP_HOST}:{ZAP_PORT}',
+        'https': f'http://{ZAP_HOST}:{ZAP_PORT}'
+    }
 )
 
 def run_scans(target, scan_id, start_phase="Nmap", user_email=None):
@@ -1480,7 +1673,7 @@ def settings():
     conn.close()
 
     twofa_enabled = bool(row and row[0])
-    return render_template("settings.html", user=session.get("user"), twofa_enabled=twofa_enabled)
+    return render_template("settings.html", user=session.get("user"), twofa_enabled=twofa_enabled, user_lang=get_user_lang(), active_page="settings")
 @app.route('/settings', methods=['POST'])
 @login_required
 def update_settings():
@@ -1616,6 +1809,39 @@ def resume_scan(scan_id):
 
     threading.Thread(target=run_scans, args=(target, new_scan_id, phase, session.get("email")), daemon=True).start()
     return jsonify({"scan_id": new_scan_id, "message": f"Resuming from {phase}"})
+
+@app.route('/relaunch/<scan_id>', methods=['POST'])
+@login_required
+def relaunch_scan(scan_id):
+    """Relaunch a completed scan against the same target with the same profile."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT target, profile FROM scans WHERE scan_id=? AND user=?", (scan_id, session.get("user")))
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "Scan not found"}), 404
+
+    target, profile = row[0], row[1]
+    new_scan_id = str(uuid.uuid4())[:6]
+
+    SCAN_JOBS[new_scan_id] = {
+        "id": new_scan_id,
+        "user": session.get("user"),
+        "target": target,
+        "spider": 0, "active": 0, "nmap": 0, "progress": 0,
+        "status": "Starting...",
+        "alerts": [], "terminated": False,
+        "created": datetime.utcnow().isoformat(),
+        "profile": profile,
+        "use_nmap": profile in ["deep", "quick", "targeted_ports"],
+        "use_zap": profile in ["deep", "quick", "targeted_web"]
+    }
+
+    threading.Thread(target=run_scans, args=(target, new_scan_id, "Nmap", session.get("email")), daemon=True).start()
+    log_activity(session.get("user"), "RELAUNCH_SCAN", f"Relaunched scan for {target} (profile: {profile})")
+    return jsonify({"scan_id": new_scan_id, "message": f"Scan relaunched for {target}"})
 
 
 # ================= SCHEDULED SCANS =================
@@ -1958,6 +2184,149 @@ def history():
 
 # ================= REPORT FIXED SYSTEM =================
 
+# ================= REPORT CHART HELPERS =================
+
+def _load_report_font(size):
+    """Load a TTF font for chart rendering with fallback to default."""
+    from PIL import ImageFont
+    candidates = [
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+    ]
+    for fp in candidates:
+        try:
+            return ImageFont.truetype(fp, size)
+        except Exception:
+            continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+def _severity_distribution(alerts, severity_resolver):
+    """Count alerts by severity using the provided resolver."""
+    labels = ["Critical", "High", "Medium", "Low", "Informational"]
+    counts = {label: 0 for label in labels}
+    for a in alerts or []:
+        sev = severity_resolver(a)
+        if sev in counts:
+            counts[sev] += 1
+        else:
+            counts["Informational"] += 1
+    return counts
+
+def _port_summary(alerts):
+    """Summarize open ports/services from scan alerts."""
+    ports = parse_port_entries(alerts or [])
+    summary = {}
+    for p in ports:
+        key = f"{p.get('port')}/{p.get('protocol')} ({p.get('service') or 'Unknown'})"
+        summary[key] = summary.get(key, 0) + 1
+    return summary
+
+def _severity_chart_png(alerts, severity_resolver):
+    """Generate a severity distribution bar chart as PNG bytes using Pillow."""
+    from PIL import Image, ImageDraw
+
+    counts = _severity_distribution(alerts, severity_resolver)
+    labels = ["Critical", "High", "Medium", "Low", "Informational"]
+    colors = [(220, 38, 38), (231, 76, 60), (243, 156, 18), (39, 174, 96), (56, 189, 248)]
+
+    width, height = 620, 260
+    img = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(img)
+
+    margin_left, margin_right = 50, 20
+    margin_top, margin_bottom = 40, 50
+    chart_w = width - margin_left - margin_right
+    chart_h = height - margin_top - margin_bottom
+
+    max_count = max(counts.values()) if counts else 0
+    max_count = max(max_count, 1)
+
+    slot_w = chart_w / len(labels)
+    bar_w = slot_w * 0.55
+    font = _load_report_font(14)
+    small_font = _load_report_font(12)
+
+    for i, label in enumerate(labels):
+        count = counts[label]
+        x0 = margin_left + i * slot_w + (slot_w - bar_w) / 2
+        bar_h = int((count / max_count) * chart_h) if count > 0 else 2
+        y0 = margin_top + chart_h - bar_h
+        x1 = x0 + bar_w
+        y1 = margin_top + chart_h
+
+        draw.rectangle([x0, y0, x1, y1], fill=colors[i])
+
+        # Count label above bar
+        count_text = str(count)
+        bbox = draw.textbbox((0, 0), count_text, font=font)
+        tw = bbox[2] - bbox[0]
+        draw.text((x0 + bar_w / 2 - tw / 2, y0 - 20), count_text, fill="black", font=font)
+
+        # Severity label below
+        bbox = draw.textbbox((0, 0), label, font=small_font)
+        tw = bbox[2] - bbox[0]
+        draw.text((x0 + bar_w / 2 - tw / 2, margin_top + chart_h + 8), label, fill="black", font=small_font)
+
+    # Axes
+    draw.line([margin_left, margin_top + chart_h, width - margin_right, margin_top + chart_h], fill="black")
+    draw.line([margin_left, margin_top, margin_left, margin_top + chart_h], fill="black")
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+def _ports_chart_png(alerts):
+    """Generate an open ports/services horizontal bar chart as PNG bytes using Pillow."""
+    from PIL import Image, ImageDraw
+
+    summary = _port_summary(alerts)
+    if not summary:
+        return None
+
+    # Sort by count descending, take top 8
+    items = sorted(summary.items(), key=lambda x: x[1], reverse=True)[:8]
+
+    width, height = 620, 30 + len(items) * 26 + 20
+    img = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(img)
+
+    margin_left, margin_right = 200, 50
+    margin_top, margin_bottom = 15, 15
+    chart_w = width - margin_left - margin_right
+    chart_h = height - margin_top - margin_bottom
+
+    max_count = max(v for _, v in items) if items else 1
+    max_count = max(max_count, 1)
+
+    row_h = chart_h / len(items)
+    bar_h = row_h * 0.6
+    font = _load_report_font(12)
+
+    for i, (label, count) in enumerate(items):
+        y0 = margin_top + i * row_h + (row_h - bar_h) / 2
+        bar_w = int((count / max_count) * chart_w) if count > 0 else 2
+
+        # Label (truncate to fit)
+        short_label = label if len(label) <= 28 else label[:27] + "..."
+        draw.text((margin_left - 195, y0), short_label, fill="black", font=font)
+
+        # Bar
+        draw.rectangle([margin_left, y0, margin_left + bar_w, y0 + bar_h], fill=(52, 152, 219))
+
+        # Count
+        draw.text((margin_left + bar_w + 6, y0), str(count), fill="black", font=font)
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
 @app.route('/report', methods=['GET', 'POST'])
 @login_required
 def report_router():
@@ -1996,6 +2365,92 @@ def report_router():
     if not isinstance(alerts, list):
         alerts = []
 
+    def get_short_description(a):
+        alert_name = a.get("alert", "")
+        desc = a.get("description", "")
+        solution = a.get("solution", "")
+        cves = a.get("cves") or []
+        
+        # 1. If CVEs exist, construct description from the CVE details
+        if isinstance(cves, list) and len(cves) > 0:
+            cve = cves[0]
+            if isinstance(cve, dict):
+                cve_id = cve.get("id") or "CVE"
+                cve_title = cve.get("title") or ""
+            else:
+                cve_id = str(cve)
+                cve_title = ""
+            cve_title = " ".join(cve_title.split())
+            cve_info = f" ({cve_title})" if cve_title else ""
+            return f"This service is affected by a known vulnerability {cve_id}{cve_info}. Exploitation of this vulnerability could lead to unauthorized system access or denial of service. It is highly recommended to update the service to the latest secure version."
+
+        # 2. Map standard/common alerts to high-quality, concise descriptions
+        alert_lower = alert_name.lower()
+        
+        if "content security policy" in alert_lower or "csp" in alert_lower:
+            return "The Content Security Policy (CSP) header is not configured on the web server. Without CSP, the site is vulnerable to Cross-Site Scripting (XSS) and data injection attacks. Implement a robust CSP header to restrict the sources of executable scripts and resources."
+            
+        if "http only site" in alert_lower or "insecure ssl/tls" in alert_lower:
+            return "The website is accessible over unencrypted HTTP, transmitting all communication in cleartext. This allows attackers to perform man-in-the-middle attacks and intercept sensitive data like login credentials. Configure SSL/TLS encryption and redirect all HTTP traffic to HTTPS."
+            
+        if "clickjacking" in alert_lower or "x-frame-options" in alert_lower:
+            return "The X-Frame-Options or CSP frame-ancestors header is missing from HTTP responses. This allows attackers to embed this site in an iframe on an external page and perform clickjacking attacks to trick users. Configure the X-Frame-Options header to 'SAMEORIGIN' or 'DENY'."
+            
+        if "x-content-type-options" in alert_lower:
+            return "The X-Content-Type-Options header is missing, allowing web browsers to MIME-sniff the response content type. This could lead to security issues where user-uploaded files are executed as scripts. Configure the web server to send this header set to 'nosniff'."
+            
+        if "subdomain found" in alert_lower:
+            return "An active subdomain was discovered during security reconnaissance. Exposing unmonitored subdomains increases the overall attack surface and may expose outdated services. Verify that this subdomain is authorized, monitored, and properly secured."
+            
+        if "technology fingerprint" in alert_lower or "server header" in alert_lower:
+            return "The web server reveals software and version details in response headers (such as 'Server' or 'X-Powered-By'). Attackers use this fingerprinting information to identify potential exploits targeting your specific software versions. Configure your web server to hide or sanitize these headers."
+
+        if "scanner core unavailable" in alert_lower:
+            return "The ZAP vulnerability scanner core engine is not running on this server. This limits the depth of web application vulnerability scanning. Ensure that the ZAP daemon is correctly installed and active in the scanner's environment."
+
+        if "retrieved from cache" in alert_lower:
+            return "Sensitive web page responses might be stored in public or browser caches. This could allow unauthorized users to retrieve cached pages containing sensitive user-specific data. Configure cache control headers such as 'no-store' or 'private' to prevent caching."
+
+        if "sample vulnerability" in alert_lower:
+            return "A sample placeholder vulnerability was detected. This finding is used to demonstrate the report layout and severity distribution. Ensure all system components are correctly configured and real scans are conducted."
+
+        # 3. Check if it's a port-related alert
+        port_match = re.search(r'port\s+(\d+)', alert_lower)
+        if port_match:
+            port_num = int(port_match.group(1))
+            # Look up in PORT_KNOWLEDGE_BASE
+            base_profile = PORT_KNOWLEDGE_BASE.get(port_num)
+            if base_profile:
+                service = base_profile.get("service", "unknown service")
+                rec = base_profile.get("recommendation", "restrict access")
+                return f"An open network port was detected running the {service} service. Exposing services directly to the network increases the system's attack surface and can invite unauthorized access attempts. It is recommended to: {rec.lower()}."
+            else:
+                return f"An open network port ({port_num}) was detected on the target. Exposed network ports present potential entry points for attackers to probe and exploit services. Restrict access to this port using a firewall and disable the service if it is not required."
+
+        # 4. If there's an existing description from ZAP or other scans, reuse/format it
+        if desc and desc.strip():
+            # Clean the description up to 1-2 sentences
+            sentences = [s.strip() for s in re.split(r'\. |\? |\! ', desc) if s.strip()]
+            short_desc = ". ".join(sentences[:2])
+            if not short_desc.endswith('.'):
+                short_desc += '.'
+            # Add why it matters and what to do if not already present
+            if solution:
+                sol_text = solution.strip()
+                sol_sentences = [s.strip() for s in re.split(r'\. |\? |\! ', sol_text) if s.strip()]
+                sol_brief = sol_sentences[0] if sol_sentences else sol_text
+                if not sol_brief.endswith('.'):
+                    sol_brief += '.'
+                return f"{short_desc} This can lead to unauthorized access or system compromise. To address this, you should: {sol_brief}"
+            else:
+                return f"{short_desc} This vulnerability can expose sensitive data or operations. Ensure proper input sanitization and secure configuration to remediate it."
+
+        # 5. Default fallback
+        fallback = f"A security finding was detected: {alert_name}."
+        if solution:
+            fallback += f" To address this issue, you should: {solution}."
+        return fallback
+
     # ✅ Add First/Last Detection logic
     for a in alerts:
         a["last_detected"] = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
@@ -2007,6 +2462,30 @@ def report_router():
         first = c_hist.fetchone()
         conn_hist.close()
         a["first_flagged"] = first[0] if first else a["last_detected"]
+        a["description"] = get_short_description(a)
+
+    # Build a lookup of interpreted port severity values so the report Severity
+    # column matches the View Scan page's Open Ports & Services table.
+    # Port alerts are stored as "Info" in the raw scan data but the port
+    # knowledge base resolves them to their real severity (Critical/High/
+    # Medium/Low/Informational). Non-port findings keep their original value.
+    port_severity_lookup = {}
+    for pe in parse_port_entries(alerts):
+        port_severity_lookup[pe["raw"]["path"]] = pe["risk"]
+
+    def report_severity(a):
+        """Resolve the displayed severity for a finding in report output.
+
+        Uses the interpreted port severity for port alerts, falls back to the
+        raw alert risk value, and normalizes 'Info' to 'Informational'.
+        """
+        raw = port_severity_lookup.get(a.get("path", ""), a.get("risk", ""))
+        raw = (raw or "").strip()
+        if raw.lower() in ("critical", "high", "medium", "low"):
+            return raw
+        if raw.lower() in ("info", "informational"):
+            return "Informational"
+        return raw or "Unknown"
 
     def sanitize_for_pdf(text):
         if not text: return ""
@@ -2053,7 +2532,7 @@ def report_router():
             pdf.ln(5)
             
             pdf.set_font("Arial", "", 11)
-            pdf.multi_cell(0, 7, sanitize_for_pdf(f"This professional security assessment was performed against {target}. The analysis identifies vulnerabilities across multiple categories, including OWASP Top 10 mapping and risk-based prioritization."))
+            pdf.multi_cell(0, 7, sanitize_for_pdf(f"This professional security assessment was performed against {target}. The analysis identifies vulnerabilities across multiple categories, including OWASP Top 10 mapping and severity-based prioritization."))
             
             pdf.ln(5)
             # Summary Stats
@@ -2061,17 +2540,28 @@ def report_router():
             high = len([a for a in alerts if a.get("risk") == "High"])
             med = len([a for a in alerts if a.get("risk") == "Medium"])
             
-            # DRAW SIMPLE BAR CHART
-            pdf.set_font("Arial", "B", 10)
-            pdf.cell(40, 10, f"Critical/High Alerts: {high}")
-            pdf.set_fill_color(231, 76, 60)
-            pdf.rect(50, pdf.get_y() + 2, max(2, high * 5), 6, 'F')
-            pdf.ln(8)
+            # Severity Distribution Chart
+            try:
+                sev_chart = _severity_chart_png(alerts, report_severity)
+                if sev_chart:
+                    pdf.image(sev_chart, x=10, w=180)
+                    pdf.ln(5)
+            except Exception:
+                pass
             
-            pdf.cell(40, 10, f"Medium Alerts: {med}")
-            pdf.set_fill_color(243, 156, 18)
-            pdf.rect(50, pdf.get_y() + 2, max(2, med * 5), 6, 'F')
-            pdf.ln(10)
+            # Open Ports & Services Chart
+            try:
+                ports_chart = _ports_chart_png(alerts)
+                if ports_chart:
+                    pdf.ln(3)
+                    pdf.set_font("Arial", "B", 12)
+                    pdf.set_text_color(15, 23, 42)
+                    pdf.cell(0, 8, "Open Ports & Services Summary", ln=True)
+                    pdf.ln(3)
+                    pdf.image(ports_chart, x=10, w=180)
+                    pdf.ln(5)
+            except Exception:
+                pass
 
             # 2. Technical Findings
             pdf.set_font("Arial", "B", 16)
@@ -2081,14 +2571,14 @@ def report_router():
             for i, a in enumerate(alerts, start=1):
                 if pdf.get_y() > 250: pdf.add_page()
                 
-                risk = a.get("risk", "Info")
+                severity = sanitize_for_pdf(report_severity(a))
                 alert_name = sanitize_for_pdf(a.get("alert", ""))
                 owasp_cat = sanitize_for_pdf(map_to_owasp(a.get("alert", "")))
                 
                 pdf.set_x(10)
                 pdf.set_font("Arial", "B", 11)
                 pdf.set_fill_color(241, 245, 249)
-                pdf.cell(190, 8, f" {i}. {alert_name} [{risk}]", fill=True)
+                pdf.cell(190, 8, f" {i}. {alert_name} [{severity}]", fill=True)
                 pdf.ln(8)
                 
                 pdf.set_x(10)
@@ -2113,8 +2603,11 @@ def report_router():
                     pass
                 pdf.ln(5)
 
-            pdf_bytes = pdf.output()
-            response = make_response(bytes(pdf_bytes))
+            pdf_bytes = pdf.output(dest='S')
+            # fpdf2 may return str or bytes depending on version; normalize to bytes
+            if isinstance(pdf_bytes, str):
+                pdf_bytes = pdf_bytes.encode('latin-1')
+            response = make_response(pdf_bytes)
             response.headers["Content-Type"] = "application/pdf"
             response.headers["Content-Disposition"] = f"attachment; filename=VigiScan_{target}_Report.pdf"
             return response
@@ -2128,9 +2621,9 @@ def report_router():
         rows = []
         for a in alerts:
             rows.append({
-                "Alert": a.get("alert", ""),
-                "Risk": a.get("risk", ""),
-                "URL": a.get("path", ""),
+                "Vulnerability Title": a.get("alert", ""),
+                "Severity": report_severity(a),
+                "Vulnerability Path": a.get("path", ""),
                 "Solution": a.get("solution", "")
             })
 
@@ -2145,9 +2638,9 @@ def report_router():
         rows = []
         for a in alerts:
             rows.append({
-                "Alert": a.get("alert", ""),
-                "Risk": a.get("risk", ""),
-                "URL": a.get("path", ""),
+                "Vulnerability Title": a.get("alert", ""),
+                "Severity": report_severity(a),
+                "Vulnerability Path": a.get("path", ""),
                 "Solution": a.get("solution", "")
             })
 
@@ -2161,17 +2654,69 @@ def report_router():
     elif report_type == "html":
         rows_html = ""
         for a in alerts:
-            risk_class = "risk-low"
-            if a.get("risk") == "High": risk_class = "risk-high"
-            elif a.get("risk") == "Medium": risk_class = "risk-medium"
+            severity = report_severity(a)
+            severity_class = "severity-low"
+            if severity == "Critical": severity_class = "severity-critical"
+            elif severity == "High": severity_class = "severity-high"
+            elif severity == "Medium": severity_class = "severity-medium"
+            elif severity == "Informational": severity_class = "severity-info"
+            
+            desc_text = a.get('description', '')
+            desc_html = f'<div style="font-size: 9px; color: #555; margin-top: 4px; line-height: 1.3;"><strong>Description:</strong> {desc_text}</div>' if desc_text else ''
+            
             rows_html += f"""
                 <tr>
-                    <td>{a.get('alert', '')}</td>
-                    <td class='{risk_class}'>{a.get('risk', '')}</td>
+                    <td>
+                        <strong>{a.get('alert', '')}</strong>
+                        {desc_html}
+                    </td>
+                    <td class='{severity_class}'>{severity}</td>
                     <td>{a.get('first_flagged', '')}</td>
                     <td>{a.get('last_detected', '')}</td>
                     <td>{a.get('solution', '')}</td>
                 </tr>"""
+
+        # --- Severity Distribution Chart (CSS bars) ---
+        sev_counts = _severity_distribution(alerts, report_severity)
+        sev_max = max(sev_counts.values()) if sev_counts else 1
+        sev_max = max(sev_max, 1)
+        sev_colors = {
+            "Critical": "#dc2626",
+            "High": "#e74c3c",
+            "Medium": "#f39c12",
+            "Low": "#27ae60",
+            "Informational": "#38bdf8",
+        }
+        sev_chart_html = ""
+        for label in ["Critical", "High", "Medium", "Low", "Informational"]:
+            count = sev_counts[label]
+            pct = int((count / sev_max) * 100) if count > 0 else 0
+            sev_chart_html += f"""
+                <div class="chart-row">
+                    <span class="chart-label">{label}</span>
+                    <div class="chart-track">
+                        <div class="chart-bar" style="width:{pct}%;background:{sev_colors[label]};">{count}</div>
+                    </div>
+                </div>"""
+
+        # --- Open Ports & Services Chart (CSS bars) ---
+        port_summary = _port_summary(alerts)
+        ports_chart_html = ""
+        if port_summary:
+            port_items = sorted(port_summary.items(), key=lambda x: x[1], reverse=True)[:10]
+            port_max = max(v for _, v in port_items) if port_items else 1
+            port_max = max(port_max, 1)
+            for label, count in port_items:
+                pct = int((count / port_max) * 100) if count > 0 else 0
+                ports_chart_html += f"""
+                <div class="chart-row">
+                    <span class="chart-label">{label}</span>
+                    <div class="chart-track">
+                        <div class="chart-bar chart-port" style="width:{pct}%;">{count}</div>
+                    </div>
+                </div>"""
+        else:
+            ports_chart_html = "<p><em>No open ports/services detected in this scan.</em></p>"
 
         html_content = f"""
         <html>
@@ -2183,17 +2728,34 @@ def report_router():
                 table {{ width: 100%; border-collapse: collapse; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }}
                 th {{ background: #3498db; color: white; padding: 10px; font-size: 14px; }}
                 td {{ border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 10px; }} /* ✅ Reduced from 12? to 10 */
-                .risk-high {{ color: #e74c3c; font-weight: bold; }}
-                .risk-medium {{ color: #f39c12; font-weight: bold; }}
-                .risk-low {{ color: #27ae60; font-weight: bold; }}
+                .severity-critical {{ color: #dc2626; font-weight: bold; }}
+                .severity-high {{ color: #e74c3c; font-weight: bold; }}
+                .severity-medium {{ color: #f39c12; font-weight: bold; }}
+                .severity-low {{ color: #27ae60; font-weight: bold; }}
+                .severity-info {{ color: #38bdf8; font-weight: bold; }}
+                .chart-container {{ background: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+                .chart-container h3 {{ margin-top: 0; color: #2c3e50; font-size: 16px; }}
+                .chart-row {{ display: flex; align-items: center; margin-bottom: 8px; }}
+                .chart-label {{ width: 140px; font-size: 12px; color: #555; text-align: right; padding-right: 10px; }}
+                .chart-track {{ flex: 1; background: #f0f0f0; border-radius: 4px; height: 24px; position: relative; }}
+                .chart-bar {{ height: 24px; border-radius: 4px; color: white; font-size: 12px; line-height: 24px; text-align: center; min-width: 24px; }}
+                .chart-port {{ background: #3498db; }}
             </style>
         </head>
         <body>
             <h2>🛡️ VigiScan Security Report</h2>
             <p><strong>Target:</strong> {target}</p>
             <p><strong>Date:</strong> {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <div class="chart-container">
+                <h3>Vulnerability Severity Distribution</h3>
+                {sev_chart_html}
+            </div>
+            <div class="chart-container">
+                <h3>Open Ports & Services</h3>
+                {ports_chart_html}
+            </div>
             <table>
-                <tr><th>Alert</th><th>Risk</th><th>First Seen</th><th>Last Seen</th><th>Solution</th></tr>
+                <tr><th>Vulnerability Title</th><th>Severity</th><th>First Seen</th><th>Last Seen</th><th>Solution</th></tr>
                 {rows_html}
             </table>
         </body>
@@ -2209,18 +2771,354 @@ def report_router():
     return "Invalid report type", 400
 
 
+# ================= MULTI-PAGE ROUTES =================
+def get_user_lang():
+    """Helper to get the current user's language preference."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT settings FROM users WHERE username=?", (session.get("user"),))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0]:
+            settings_data = json.loads(row[0])
+            return settings_data.get("language", "en")
+    except:
+        pass
+    return "en"
+
+@app.route('/history-page')
+@login_required
+def history_page():
+    return render_template("history.html", user=session.get("user"), user_lang=get_user_lang(), active_page="history")
+
+@app.route('/assets')
+@login_required
+def assets_page():
+    return render_template("assets.html", user=session.get("user"), user_lang=get_user_lang(), active_page="assets")
+
+@app.route('/assets/<int:asset_id>')
+@login_required
+def asset_detail_page(asset_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, name, ip, domain, owner, environment, criticality, is_internet_facing, asset_group FROM assets WHERE id=?", (asset_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        flash("Asset not found.", "danger")
+        return redirect('/assets')
+    asset = {
+        "id": row[0], "name": row[1], "ip": row[2], "domain": row[3],
+        "owner": row[4], "environment": row[5], "criticality": row[6],
+        "is_internet_facing": bool(row[7]), "asset_group": row[8]
+    }
+    return render_template("asset_detail.html", user=session.get("user"), user_lang=get_user_lang(), active_page="assets", asset=asset)
+
+@app.route('/scans')
+@login_required
+def scans_page():
+    scan_type = request.args.get('type', '')
+    return render_template("scans.html", user=session.get("user"), user_lang=get_user_lang(), active_page="scans", scan_type=scan_type)
+
+@app.route('/scans/<scan_id>')
+@login_required
+def scan_detail_page(scan_id):
+    # Try in-memory first, then DB
+    job = SCAN_JOBS.get(scan_id)
+    scan_data = None
+    if job:
+        scan_data = {
+            "scan_id": scan_id,
+            "target": job.get("target", ""),
+            "status": job.get("status", ""),
+            "profile": job.get("profile", "deep"),
+            "alerts": job.get("alerts", []),
+            "fixed": job.get("fixed", []),
+            "date": job.get("created", ""),
+            "current_phase": job.get("current_phase", ""),
+            "is_live": job.get("status") not in ["Completed", "Terminated", "Not Found"]
+        }
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT scan_id, target, date, alerts, profile, status, current_phase, fixed, user FROM scans WHERE scan_id=?", (scan_id,))
+        row = c.fetchone()
+        conn.close()
+        if row:
+            try:
+                alerts = json.loads(row[3]) if row[3] else []
+            except:
+                alerts = []
+            try:
+                fixed = json.loads(row[7]) if row[7] else []
+            except:
+                fixed = []
+            scan_data = {
+                "scan_id": row[0],
+                "target": row[1],
+                "date": row[2],
+                "alerts": alerts,
+                "profile": row[4],
+                "status": row[5],
+                "current_phase": row[6],
+                "fixed": fixed,
+                "user": row[8],
+                "is_live": False
+            }
+    if not scan_data:
+        flash("Scan not found.", "danger")
+        return redirect('/scans')
+
+    # Parse the existing Nmap port alerts into a structured table.
+    # Raw scan data remains untouched in scan.alerts for technical details.
+    port_entries = parse_port_entries(scan_data.get("alerts", []))
+    port_entries.sort(key=lambda p: p["port"])
+
+    return render_template("scan_detail.html", user=session.get("user"), user_lang=get_user_lang(), active_page="scans", scan=scan_data, port_entries=port_entries)
+
+@app.route('/vulnerabilities')
+@login_required
+def vulnerabilities_page():
+    severity = request.args.get('severity', '')
+    status = request.args.get('status', '')
+    return render_template("vulnerabilities.html", user=session.get("user"), user_lang=get_user_lang(), active_page="vulnerabilities", filter_severity=severity, filter_status=status)
+
+@app.route('/vulnerabilities/<int:vuln_id>')
+@login_required
+def vulnerability_detail_page(vuln_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT v.id, v.scan_id, v.asset_id, v.name, v.severity, v.risk_score, v.status, v.cvss_score, v.exposure, v.compliance_tags, v.date_found, v.last_seen, a.name, a.ip, a.domain, a.criticality
+        FROM vulnerabilities v
+        LEFT JOIN assets a ON v.asset_id = a.id
+        WHERE v.id=?
+    """, (vuln_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        flash("Vulnerability not found.", "danger")
+        return redirect('/vulnerabilities')
+    
+    try:
+        compliance_tags = json.loads(row[9]) if row[9] else []
+    except:
+        compliance_tags = []
+    
+    vuln = {
+        "id": row[0], "scan_id": row[1], "asset_id": row[2], "name": row[3],
+        "severity": row[4], "risk_score": row[5], "status": row[6],
+        "cvss_score": row[7], "exposure": row[8], "compliance_tags": compliance_tags,
+        "date_found": row[9], "last_seen": row[10],
+        "asset_name": row[11], "asset_ip": row[12], "asset_domain": row[13],
+        "asset_criticality": row[14]
+    }
+    
+    # Get scan alerts for this vulnerability to find evidence
+    evidence = None
+    if vuln["scan_id"]:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT alerts FROM scans WHERE scan_id=?", (vuln["scan_id"],))
+        scan_row = c.fetchone()
+        conn.close()
+        if scan_row and scan_row[0]:
+            try:
+                alerts = json.loads(scan_row[0])
+                for a in alerts:
+                    if a.get("alert") == vuln["name"]:
+                        evidence = a
+                        break
+            except:
+                pass
+    
+    # Get CVE info from evidence
+    cves = []
+    if evidence and evidence.get("cves"):
+        cves = evidence["cves"]
+    
+    # Get remediation
+    remediation = get_remediation(vuln["name"])
+    
+    # Get OWASP mapping
+    owasp = map_to_owasp(vuln["name"])
+    
+    # Get MITRE ATT&CK mapping (heuristic)
+    mitre = []
+    name_lower = vuln["name"].lower()
+    if "sql" in name_lower or "injection" in name_lower:
+        mitre = [{"id": "T1190", "name": "Exploit Public-Facing Application", "tactic": "Initial Access"}]
+    elif "xss" in name_lower or "cross" in name_lower:
+        mitre = [{"id": "T1059.007", "name": "JavaScript", "tactic": "Execution"}]
+    elif "auth" in name_lower or "login" in name_lower:
+        mitre = [{"id": "T1078", "name": "Valid Accounts", "tactic": "Defense Evasion"}]
+    elif "config" in name_lower or "misconfig" in name_lower:
+        mitre = [{"id": "T1548", "name": "Abuse Elevation Control Mechanism", "tactic": "Privilege Escalation"}]
+    elif "port" in name_lower or "service" in name_lower:
+        mitre = [{"id": "T1046", "name": "Network Service Discovery", "tactic": "Discovery"}]
+    elif "ssl" in name_lower or "tls" in name_lower or "certificate" in name_lower:
+        mitre = [{"id": "T1573", "name": "Encrypted Channel", "tactic": "Command and Control"}]
+    else:
+        mitre = [{"id": "T1190", "name": "Exploit Public-Facing Application", "tactic": "Initial Access"}]
+    
+    return render_template("vulnerability_detail.html", user=session.get("user"), user_lang=get_user_lang(), active_page="vulnerabilities", vuln=vuln, evidence=evidence, cves=cves, remediation=remediation, owasp=owasp, mitre=mitre)
+
+@app.route('/reports')
+@login_required
+def reports_page():
+    report_type = request.args.get('type', '')
+    return render_template("reports.html", user=session.get("user"), user_lang=get_user_lang(), active_page="reports", report_type=report_type)
+
+@app.route('/schedules')
+@login_required
+def schedules_page():
+    return render_template("schedules.html", user=session.get("user"), user_lang=get_user_lang(), active_page="schedules")
+
+@app.route('/risk')
+@login_required
+def risk_page():
+    return render_template("risk.html", user=session.get("user"), user_lang=get_user_lang(), active_page="risk")
+
+@app.route('/knowledge-base')
+@login_required
+def knowledge_base_page():
+    return render_template("knowledge_base.html", user=session.get("user"), user_lang=get_user_lang(), active_page="knowledge")
+
+@app.route('/api/asset/<int:asset_id>')
+@login_required
+def get_asset_detail(asset_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, name, ip, domain, owner, environment, criticality, is_internet_facing, asset_group FROM assets WHERE id=?", (asset_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Asset not found"}), 404
+    return jsonify({
+        "id": row[0], "name": row[1], "ip": row[2], "domain": row[3],
+        "owner": row[4], "environment": row[5], "criticality": row[6],
+        "is_internet_facing": bool(row[7]), "asset_group": row[8]
+    })
+
+@app.route('/api/asset/<int:asset_id>', methods=['PUT'])
+@login_required
+def update_asset(asset_id):
+    data = request.json
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM assets WHERE id=?", (asset_id,))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({"error": "Asset not found"}), 404
+    
+    name = data.get("name", "")
+    target = data.get("target", "")
+    env = data.get("env", "")
+    criticality = data.get("criticality", "Medium")
+    internet = 1 if data.get("internet") else 0
+    
+    ip = target if re.match(r'^\d{1,3}(\.\d{1,3}){3}$', target) else None
+    domain = target if not ip else None
+    
+    c.execute("UPDATE assets SET name=?, ip=?, domain=?, environment=?, criticality=?, is_internet_facing=? WHERE id=?",
+              (name, ip, domain, env, criticality, internet, asset_id))
+    conn.commit()
+    conn.close()
+    log_activity(session.get("user"), "UPDATE_ASSET", f"Updated asset: {name}")
+    return jsonify({"message": "Asset updated"})
+
+@app.route('/api/vulnerability/<int:vuln_id>')
+@login_required
+def get_vulnerability_detail(vuln_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        SELECT v.id, v.scan_id, v.asset_id, v.name, v.severity, v.risk_score, v.status, v.cvss_score, v.exposure, v.compliance_tags, v.date_found, v.last_seen, a.name
+        FROM vulnerabilities v
+        LEFT JOIN assets a ON v.asset_id = a.id
+        WHERE v.id=?
+    """, (vuln_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Vulnerability not found"}), 404
+    try:
+        compliance_tags = json.loads(row[9]) if row[9] else []
+    except:
+        compliance_tags = []
+    return jsonify({
+        "id": row[0], "scan_id": row[1], "asset_id": row[2], "name": row[3],
+        "severity": row[4], "risk_score": row[5], "status": row[6],
+        "cvss_score": row[7], "exposure": row[8], "compliance_tags": compliance_tags,
+        "date_found": row[9], "last_seen": row[10], "asset_name": row[11]
+    })
+
+@app.route('/api/cve/search')
+@login_required
+def cve_search():
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify([])
+    # Use the existing lookup_cves function
+    cves = lookup_cves(query, "")
+    return jsonify(cves)
+
+@app.route('/api/risk/overview')
+@login_required
+def risk_overview():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Total vulnerabilities by severity
+    c.execute("SELECT severity, COUNT(*) FROM vulnerabilities GROUP BY severity")
+    by_severity = {r[0]: r[1] for r in c.fetchall()}
+    
+    # By status
+    c.execute("SELECT status, COUNT(*) FROM vulnerabilities GROUP BY status")
+    by_status = {r[0]: r[1] for r in c.fetchall()}
+    
+    # By asset
+    c.execute("""
+        SELECT a.id, a.name, COUNT(v.id) as cnt, SUM(v.risk_score) as total_risk
+        FROM vulnerabilities v
+        LEFT JOIN assets a ON v.asset_id = a.id
+        GROUP BY a.id
+        ORDER BY total_risk DESC NULLS LAST
+        LIMIT 10
+    """)
+    by_asset = [{"id": r[0], "name": r[1] or "Unknown", "count": r[2], "risk": r[3] or 0} for r in c.fetchall()]
+    
+    # Highest risk vulnerabilities
+    c.execute("""
+        SELECT v.id, v.name, v.risk_score, v.severity, a.name
+        FROM vulnerabilities v
+        LEFT JOIN assets a ON v.asset_id = a.id
+        ORDER BY v.risk_score DESC
+        LIMIT 10
+    """)
+    highest_risk = [{"id": r[0], "name": r[1], "risk_score": r[2], "severity": r[3], "asset": r[4]} for r in c.fetchall()]
+    
+    # Total assets
+    c.execute("SELECT COUNT(*) FROM assets")
+    total_assets = c.fetchone()[0]
+    
+    # Total scans
+    c.execute("SELECT COUNT(*) FROM scans")
+    total_scans = c.fetchone()[0]
+    
+    conn.close()
+    
+    return jsonify({
+        "by_severity": by_severity,
+        "by_status": by_status,
+        "by_asset": by_asset,
+        "highest_risk": highest_risk,
+        "total_assets": total_assets,
+        "total_scans": total_scans,
+        "total_vulnerabilities": sum(by_severity.values())
+    })
+
 # ================= RUN =================
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
-
-@app.route('/set-my-email/<username>/<path:email>')
-def set_my_email(username, email):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("UPDATE users SET email=? WHERE username=?", (email, username))
-    updated = c.rowcount
-    conn.commit()
-    conn.close()
-    if updated == 0:
-        return f"<h1>HACK FAILED: Username '{username}' not found in database!</h1>"
-    return f"<h1>HACK SUCCESS: {username}'s email is now {email}</h1><p>You can now use the Forgot Password page!</p>"

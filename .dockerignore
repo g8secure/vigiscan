@@ -1,0 +1,53 @@
+# ============================================================
+# VigiScan - Docker build context exclusions
+# ============================================================
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Database (persisted on Render disk at /data, not in image)
+*.db
+*.db-journal
+*.db.txt
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Reports and generated files
+*.pdf
+*.xlsx
+*.csv
+reports/
+scan_report.*
+VigiScan_Report_*
+VulnReport_*
+
+# Git / IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local test scripts
+test.js
+test_lang.py
+fix_db_paths.py
+run_scanner.ps1
+
+# Juice Shop (test target, not needed in image)
+juice-shop/
+
+# Instance folder
+instance/

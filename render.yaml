@@ -4,6 +4,7 @@ services:
     env: docker
     region: oregon
     plan: free
+    healthCheckPath: /login
     envVars:
       - key: FLASK_ENV
         value: production
@@ -13,6 +14,19 @@ services:
         sync: false
       - key: VIGISCAN_MAIL_PASS
         sync: false
+      # ZAP daemon connection (defaults match start.sh; override only if needed)
+      - key: ZAP_HOST
+        value: 127.0.0.1
+      - key: ZAP_PORT
+        value: "8080"
+      - key: ZAP_API_KEY
+        value: ""
+      # ZAP JVM heap cap (Render Free has ~512MB RAM; 300m leaves room for Flask + Nmap)
+      - key: ZAP_MAX_HEAP
+        value: "300m"
+      # Startup timeout for ZAP readiness (seconds)
+      - key: ZAP_WAIT_MAX
+        value: "120"
     disk:
       name: vigiscan-data
       mountPath: /data

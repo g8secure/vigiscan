@@ -1,9 +1,15 @@
 # scanner/zap_scan.py
 from zapv2 import ZAPv2
 import time
+import os
 
-ZAP_API_KEY = ""  # set if you enabled API key
-ZAP_PROXY = {'http': 'http://127.0.0.1:8080', 'https': 'http://127.0.0.1:8080'}
+ZAP_API_KEY = os.environ.get("ZAP_API_KEY", "")  # set if you enabled API key
+ZAP_HOST = os.environ.get("ZAP_HOST", "127.0.0.1")
+ZAP_PORT = int(os.environ.get("ZAP_PORT", "8080"))
+ZAP_PROXY = {
+    'http': f'http://{ZAP_HOST}:{ZAP_PORT}',
+    'https': f'http://{ZAP_HOST}:{ZAP_PORT}'
+}
 zap = ZAPv2(apikey=ZAP_API_KEY, proxies=ZAP_PROXY)
 
 def start_zap(target_url):

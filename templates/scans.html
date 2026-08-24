@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Scans - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Scans</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Security Scans</h1>
+            <p class="page-subtitle">Launch new assessments and monitor scan progress</p>
+        </div>
+        <a href="/schedules" class="btn btn-secondary"><i class="fas fa-calendar-alt"></i> Scheduled Scans</a>
+    </div>
+
+    <!-- ================= SCAN LAUNCHER ================= -->
+    <div class="card">
+        <h3>🚀 Launch New Scan</h3>
+        <div class="form-grid">
+            <div>
+                <label>Target URL or IP</label>
+                <input type="text" id="target" placeholder="https://example.com or 192.168.1.1" value="{{ request.args.get('target', '') }}">
+            </div>
+            <div>
+                <label>Scan Profile</label>
+                <select id="scanProfile">
+                    <option value="deep">Full VMDR Scan (Deep Analysis)</option>
+                    <option value="quick">Express Scan (Critical Checks)</option>
+                    <option value="targeted_ports">Targeted: Ports Only (Nmap)</option>
+                    <option value="targeted_web">Targeted: Web Only (ZAP Spider)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div>
+                <label>API URL (Optional)</label>
+                <input type="text" id="apiUrl" placeholder="https://example.com/openapi.json">
+            </div>
+            <div>
+                <label>Scan Type</label>
+                <div style="display:flex; gap:1.5rem; padding-top:0.5rem;">
+                    <label class="form-check"><input type="checkbox" id="nmapCheck" checked> Nmap</label>
+                    <label class="form-check"><input type="checkbox" id="zapCheck" checked> OWASP ZAP</label>
+                </div>
+            </div>
+        </div>
+
+        <div id="authSection" style="display:none; background:var(--bg-secondary); padding:1rem; border-radius:8px; border:1px solid var(--glass-border); margin-bottom:1rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; font-size:0.85rem; font-weight:700; color:var(--accent-primary);">
+                <i class="fas fa-key"></i> Authenticated Access Configuration
+            </div>
+            <div class="form-grid">
+                <input type="text" id="scanUser" placeholder="Username / Key">
+                <input type="password" id="scanPass" placeholder="Password / Value">
+            </div>
+            <input type="hidden" id="authType" value="none">
+        </div>
+
+        <div style="display:flex; gap:1rem; margin-top:1rem;">
+            <button class="btn btn-primary" style="flex:2;" onclick="startScan()"><i class="fas fa-rocket"></i> START SCAN</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="toggleAuth()"><i class="fas fa-key"></i> Authenticated</button>
+        </div>
+    </div>
+
+    <!-- ================= LIVE SCAN MONITORING ================= -->
+    <div class="card">
+        <h3>📡 Active Scans</h3>
+        <div id="scanList">
+            <div class="empty-state">No active scans. Launch a scan above to begin monitoring.</div>
+        </div>
+    </div>
+
+    <!-- ================= SCAN HISTORY ================= -->
+    <div class="card">
+        <h3>📜 Scan History</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Date / Status</th>
+                        <th>Profile</th>
+                        <th>High</th>
+                        <th>Medium</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <tr><td colspan="6" class="empty-state">Loading history...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentScans = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Pre-fill target from query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetParam = urlParams.get('target');
+    if (targetParam) {
+        document.getElementById('target').value = targetParam;
+    }
+    const typeParam = urlParams.get('type');
+    if (typeParam === 'authenticated') {
+        toggleAuth();
+    }
+
+    loadHistory();
+    loadSavedScans();
+});
+
+function toggleAuth() {
+    const section = document.getElementById('authSection');
+    const authType = document.getElementById('authType');
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        authType.value = 'basic';
+    } else {
+        section.style.display = 'none';
+        authType.value = 'none';
+    }
+}
+
+function startScan() {
+    const target = document.getElementById('target').value.trim();
+    const profile = document.getElementById('scanProfile').value;
+    const apiUrl = document.getElementById('apiUrl').value;
+    const authUser = document.getElementById('scanUser').value;
+    const authPass = document.getElementById('scanPass').value;
+    const authType = document.getElementById('authType').value;
+
+    if (!target) return alert("Enter a target URL or IP");
+
+    const payload = {
+        target: target,
+        profile: profile,
+        api_url: apiUrl,
+        auth_user: authUser,
+        auth_pass: authPass,
+        auth_type: authType,
+        use_nmap: document.getElementById('nmapCheck').checked,
+        use_zap: document.getElementById('zapCheck').checked
+    };
+
+    axios.post("/api/trigger", payload)
+        .then(res => {
+            const id = res.data.scan_id;
+            currentScans[id] = { target: target };
+            document.getElementById('target').value = '';
+            createScanCard(id, target);
+            pollScan(id);
+        })
+        .catch(err => {
+            const msg = err.response?.data?.error || "Failed to initiate scan.";
+            alert("Error: " + msg);
+        });
+}
+
+function createScanCard(id, target) {
+    const list = document.getElementById('scanList');
+    // Remove empty state
+    if (list.querySelector('.empty-state')) list.innerHTML = '';
+
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.id = id;
+    div.style.marginBottom = '1rem';
+    div.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h4 style="margin:0;">🌐 ${target}</h4>
+            <span id="status_${id}" style="font-size:0.8rem; background:#e8f1f8; color:var(--accent-primary); padding:2px 8px; border-radius:4px; font-weight:600;">Starting...</span>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">Network Discovery</div>
+        <div class="progress-container" style="height:8px; background:#eee;">
+            <div class="progress-bar" id="nmap_${id}" style="background:var(--accent-primary);">0%</div>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.75rem; margin-bottom:0.25rem;">Vulnerability Scan</div>
+        <div class="progress-container" style="height:8px; background:#eee;">
+            <div class="progress-bar" id="spider_${id}" style="background:#f9a825;">0%</div>
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.75rem; margin-bottom:0.25rem;">Advanced Analysis</div>
+        <div class="progress-container" style="height:8px; background:#eee;">
+            <div class="progress-bar" id="active_${id}" style="background:#ed1c24;">0%</div>
+        </div>
+        <div style="display:flex; gap:0.75rem; margin-top:1.5rem; flex-wrap:wrap;">
+            <button onclick="window.location='/scans/${id}'" class="btn btn-primary btn-sm"><i class="fas fa-eye"></i> View Results</button>
+            <button onclick="downloadSingle('${id}','pdf')" class="btn btn-secondary btn-sm"><i class="fas fa-file-pdf"></i> PDF</button>
+            <button onclick="downloadSingle('${id}','html')" class="btn btn-secondary btn-sm"><i class="fas fa-file-code"></i> HTML</button>
+            <button onclick="downloadSingle('${id}','excel')" class="btn btn-secondary btn-sm"><i class="fas fa-file-excel"></i> Excel</button>
+            <button onclick="terminateScan('${id}')" class="btn btn-danger btn-sm"><i class="fas fa-stop-circle"></i> Stop</button>
+        </div>
+    `;
+    list.prepend(div);
+}
+
+function pollScan(id) {
+    const interval = setInterval(() => {
+        fetch(`/status/${id}`)
+            .then(res => res.json())
+            .then(data => {
+                const statusEl = document.getElementById(`status_${id}`);
+                if (statusEl) statusEl.innerText = data.status;
+                updateBar(`spider_${id}`, data.spider || 0);
+                updateBar(`active_${id}`, data.active || 0);
+                updateBar(`nmap_${id}`, data.nmap || 0);
+
+                if (["Completed", "Terminated", "Not Found"].includes(data.status) || data.status.includes("Failed")) {
+                    clearInterval(interval);
+                    // Disable Stop button once scan has finished
+                    const stopBtn = document.querySelector(`#${id} button[onclick*="terminateScan"]`);
+                    if (stopBtn) {
+                        stopBtn.disabled = true;
+                        stopBtn.classList.add('disabled');
+                        stopBtn.style.opacity = '0.5';
+                        stopBtn.style.cursor = 'not-allowed';
+                    }
+                    loadHistory();
+                }
+            });
+    }, 1000);
+}
+
+function updateBar(id, val) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.width = val + "%";
+        el.innerText = val + "%";
+    }
+}
+
+function terminateScan(id) {
+    if (!confirm("Are you sure you want to terminate this scan?")) return;
+    axios.post(`/terminate/${id}`)
+        .then(res => {
+            const statusEl = document.getElementById(`status_${id}`);
+            if (statusEl) statusEl.innerText = "Terminated";
+        })
+        .catch(err => alert("Error terminating scan"));
+}
+
+function downloadSingle(id, type) {
+    window.open(`/report?scan_id=${id}&type=${type}`, "_blank");
+}
+
+function loadHistory() {
+    fetch("/history")
+        .then(res => res.json())
+        .then(data => {
+            const body = document.getElementById("historyBody");
+            const scans = data.filter(s => !s.is_scheduled);
+            if (scans.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="empty-state">No scan history yet.</td></tr>';
+                return;
+            }
+            body.innerHTML = scans.map(h => `
+                <tr class="clickable" onclick="window.location='/scans/${h.scan_id}'">
+                    <td><strong>${h.target}</strong></td>
+                    <td>${h.status} (${h.date.replace('T', ' ').split('.')[0]})</td>
+                    <td><span class="risk-badge risk-info">${h.profile}</span></td>
+                    <td><span class="risk-badge risk-high">${h.high}</span></td>
+                    <td><span class="risk-badge risk-medium">${h.medium}</span></td>
+                    <td onclick="event.stopPropagation()">
+                        <a href="/scans/${h.scan_id}" class="btn-link"><i class="fas fa-eye"></i> View</a>
+                        <button class="btn-link" style="color:#22c55e;" onclick="relaunchScan('${h.scan_id}')" title="Relaunch scan"><i class="fas fa-sync-alt"></i> Relaunch</button>
+                        <a href="/report?scan_id=${h.scan_id}&type=pdf" class="btn-link"><i class="fas fa-file-pdf"></i></a>
+                        <a href="/report?scan_id=${h.scan_id}&type=html" class="btn-link"><i class="fas fa-file-code"></i></a>
+                        <a href="/report?scan_id=${h.scan_id}&type=excel" class="btn-link"><i class="fas fa-file-excel"></i></a>
+                        ${h.can_delete ? `<button class="btn-link" style="color:#ef4444;" onclick="deleteScan('${h.scan_id}')"><i class="fas fa-trash"></i></button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function relaunchScan(scanId) {
+    if (!confirm("Relaunch this scan against the same target with the same profile?")) return;
+    axios.post(`/relaunch/${scanId}`)
+        .then(res => {
+            const id = res.data.scan_id;
+            const target = res.data.target || 'scan';
+            currentScans[id] = { target: target };
+            createScanCard(id, target);
+            pollScan(id);
+            alert("Scan relaunched successfully!");
+            loadHistory();
+        })
+        .catch(err => alert(err.response?.data?.error || "Failed to relaunch scan"));
+}
+
+function deleteScan(scanId) {
+    if (!confirm("Are you sure you want to permanently delete this scan?")) return;
+    axios.delete(`/delete_scan/${scanId}`)
+        .then(() => loadHistory())
+        .catch(err => alert(err.response?.data?.error || "Failed to delete scan"));
+}
+
+function loadSavedScans() {
+    fetch("/active_scans")
+        .then(res => res.json())
+        .then(data => {
+            Object.keys(data).forEach(id => {
+                const scan = data[id];
+                currentScans[id] = { target: scan.target };
+                createScanCard(id, scan.target);
+                pollScan(id);
+            });
+        });
+}
+</script>
+{% endblock %}

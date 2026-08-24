@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Reports - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Reports</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Report Center</h1>
+            <p class="page-subtitle">Generate and download vulnerability reports in multiple formats</p>
+        </div>
+    </div>
+
+    <!-- Quick Report Generation -->
+    <div class="card">
+        <h3>📄 Generate Report</h3>
+        <p class="text-muted mb-2">Select a scan from history and a format to generate a detailed security report.</p>
+        <div class="form-grid">
+            <div>
+                <label>Select Scan</label>
+                <select id="reportScanSelect">
+                    <option value="">-- Select a scan --</option>
+                </select>
+            </div>
+            <div>
+                <label>Report Format</label>
+                <select id="reportFormatSelect">
+                    <option value="pdf">PDF (Professional Report)</option>
+                    <option value="html">HTML (Web Report)</option>
+                    <option value="excel">Excel (Spreadsheet)</option>
+                    <option value="csv">CSV (Data Export)</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="generateReport()"><i class="fas fa-download"></i> Generate Report</button>
+    </div>
+
+    <!-- Reports by Format -->
+    <div class="grid-3">
+        <div class="card" style="margin:0;">
+            <h3><i class="fas fa-file-pdf" style="color:#e11d48;"></i> PDF Reports</h3>
+            <p class="text-muted text-small">Professional executive summary reports with branding, OWASP mapping, and severity visualization.</p>
+            <div id="pdfReportsList" class="text-muted text-small">Select a scan above to generate your first PDF report.</div>
+        </div>
+        <div class="card" style="margin:0;">
+            <h3><i class="fas fa-file-code" style="color:#16a34a;"></i> HTML Reports</h3>
+            <p class="text-muted text-small">Colorful web-based reports with first/last detection tracking and severity indicators.</p>
+            <div id="htmlReportsList" class="text-muted text-small">Select a scan above to generate your first HTML report.</div>
+        </div>
+        <div class="card" style="margin:0;">
+            <h3><i class="fas fa-file-excel" style="color:#2563eb;"></i> Excel / CSV Reports</h3>
+            <p class="text-muted text-small">Data-friendly spreadsheets for import into SIEM or GRC tools.</p>
+            <div id="excelReportsList" class="text-muted text-small">Select a scan above to export your first Excel report.</div>
+        </div>
+    </div>
+
+    <!-- Scan History for Reports -->
+    <div class="card mt-2">
+        <h3>📜 Scan History <span class="text-muted text-small" id="scanCount"></span></h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Date</th>
+                        <th>High</th>
+                        <th>Medium</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="reportHistoryBody">
+                    <tr><td colspan="5" class="empty-state">Loading scan history...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadScanHistory();
+});
+
+function loadScanHistory() {
+    fetch('/history')
+        .then(res => res.json())
+        .then(data => {
+            const scans = data.filter(s => !s.is_scheduled);
+            document.getElementById('scanCount').innerText = `(${scans.length} scans)`;
+
+            // Populate select
+            const select = document.getElementById('reportScanSelect');
+            select.innerHTML = '<option value="">-- Select a scan --</option>' + scans.map(s =>
+                `<option value="${s.scan_id}">${s.target} (${s.date.replace('T', ' ').split('.')[0]})</option>`
+            ).join('');
+
+            // Populate table
+            const body = document.getElementById('reportHistoryBody');
+            if (scans.length === 0) {
+                body.innerHTML = '<tr><td colspan="5" class="empty-state">No scans available for reports.</td></tr>';
+                return;
+            }
+            body.innerHTML = scans.map(s => `
+                <tr>
+                    <td><strong>${s.target}</strong></td>
+                    <td>${s.date.replace('T', ' ').split('.')[0]}</td>
+                    <td><span class="risk-badge risk-high">${s.high}</span></td>
+                    <td><span class="risk-badge risk-medium">${s.medium}</span></td>
+                    <td>
+                        <a href="/report?scan_id=${s.scan_id}&type=pdf" class="btn-link" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
+                        <a href="/report?scan_id=${s.scan_id}&type=html" class="btn-link" title="Download HTML"><i class="fas fa-file-code"></i></a>
+                        <a href="/report?scan_id=${s.scan_id}&type=excel" class="btn-link" title="Download Excel"><i class="fas fa-file-excel"></i></a>
+                        <a href="/report?scan_id=${s.scan_id}&type=csv" class="btn-link" title="Download CSV"><i class="fas fa-file-csv"></i></a>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Update format lists
+            if (scans.length > 0) {
+                const latest = scans[0];
+                document.getElementById('pdfReportsList').innerHTML = `<a href="/report?scan_id=${latest.scan_id}&type=pdf" class="btn-link">Download latest PDF →</a>`;
+                document.getElementById('htmlReportsList').innerHTML = `<a href="/report?scan_id=${latest.scan_id}&type=html" class="btn-link">Download latest HTML →</a>`;
+                document.getElementById('excelReportsList').innerHTML = `<a href="/report?scan_id=${latest.scan_id}&type=excel" class="btn-link">Download latest Excel →</a>`;
+            }
+        });
+}
+
+function generateReport() {
+    const scanId = document.getElementById('reportScanSelect').value;
+    const format = document.getElementById('reportFormatSelect').value;
+    if (!scanId) {
+        alert('Please select a scan first.');
+        return;
+    }
+    window.open(`/report?scan_id=${scanId}&type=${format}`, '_blank');
+}
+</script>
+{% endblock %}

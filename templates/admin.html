@@ -1,118 +1,208 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Admin Panel</title>
+{% extends "base.html" %}
+{% block title %}Administration - VigiScan{% endblock %}
 
-<style>
-body {
-    font-family: Arial;
-    background: #0f172a;
-    color: white;
-    padding: 20px;
-}
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Administration</span>
+    </div>
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">🛡️ Administration Panel</h1>
+            <p class="page-subtitle">Manage users, roles, and system settings</p>
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <button class="btn btn-primary" onclick="openCreateUser()"><i class="fas fa-user-plus"></i> Add User</button>
+            <button class="btn btn-secondary" onclick="loadAuditLogs()"><i class="fas fa-history"></i> Audit Logs</button>
+            <button class="btn btn-secondary" onclick="loadErrorLogs()"><i class="fas fa-exclamation-triangle"></i> Error Logs</button>
+        </div>
+    </div>
 
-th, td {
-    border: 1px solid #334155;
-    padding: 10px;
-}
+    <!-- Users Table -->
+    <div class="card">
+        <h3>👥 User Management</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="userTable">
+                    <tr><td colspan="4" class="empty-state">Loading users...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-th { background: #1e293b; }
-
-button {
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-    margin-right: 5px;
-}
-
-.delete-btn {
-    background: #e74c3c;
-    color: white;
-}
-
-.make-btn {
-    background: #3498db;
-    color: white;
-}
-
-.remove-btn {
-    background: #f39c12;
-    color: white;
-}
-</style>
-</head>
-
-<body>
-
-<div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2>🛡️ Admin Panel</h2>
-    <a href="/dashboard" style="background: #38bdf8; color: #0f172a; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.9rem;">🏠 Dashboard</a>
+    <!-- System Stats -->
+    <div class="card">
+        <h3>📊 System Overview</h3>
+        <div class="stats-grid">
+            <div class="stat-card" style="cursor:default;"><div class="stat-value" id="sys-total-users">-</div><div class="stat-label">Total Users</div></div>
+            <div class="stat-card" style="cursor:default;"><div class="stat-value" id="sys-total-scans">-</div><div class="stat-label">Total Scans</div></div>
+            <div class="stat-card" style="cursor:default;"><div class="stat-value" id="sys-total-vulns">-</div><div class="stat-label">Total Vulnerabilities</div></div>
+            <div class="stat-card" style="cursor:default;"><div class="stat-value" id="sys-total-assets">-</div><div class="stat-label">Total Assets</div></div>
+        </div>
+    </div>
 </div>
-<p>Logged in as: {{ user }}</p>
 
-<table>
-<thead>
-<tr>
-<th>ID</th>
-<th>Username</th>
-<th>Role</th>
-<th>Actions</th>
-</tr>
-</thead>
+<!-- CREATE USER MODAL -->
+<div id="createUserModal" class="modal">
+    <div class="modal-header">
+        <h3>👤 Create New User</h3>
+        <button class="modal-close" onclick="closeCreateUser()">&times;</button>
+    </div>
+    <input type="text" id="new_username" placeholder="Username">
+    <input type="password" id="new_password" placeholder="Password">
+    <label class="form-check"><input type="checkbox" id="new_is_admin"> Make Admin</label>
+    <div class="modal-actions">
+        <button class="btn btn-primary" style="flex:1;" onclick="confirmCreateUser()">Create</button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="closeCreateUser()">Cancel</button>
+    </div>
+</div>
 
-<tbody id="userTable"></tbody>
-</table>
+<!-- AUDIT LOG MODAL -->
+<div id="auditModal" class="modal">
+    <div class="modal-header">
+        <h3>📜 Audit Log</h3>
+        <button class="modal-close" onclick="closeAudit()">&times;</button>
+    </div>
+    <div id="auditList" style="max-height:400px; overflow-y:auto; font-size:0.8rem;">Loading...</div>
+</div>
 
+<!-- ERROR LOG MODAL -->
+<div id="errorModal" class="modal">
+    <div class="modal-header">
+        <h3>🚨 Error Logs</h3>
+        <button class="modal-close" onclick="closeError()">&times;</button>
+    </div>
+    <div id="errorList" style="max-height:400px; overflow-y:auto; font-size:0.8rem;">Loading...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-function loadUsers(){
+document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+    loadSystemStats();
+});
+
+function loadUsers() {
     fetch('/admin/users')
-    .then(res => res.json())
-    .then(data => {
-        let html = "";
-
-        data.forEach(u => {
-            html += `
-            <tr>
-                <td>${u.id}</td>
-                <td>${u.username}</td>
-                <td>${u.role}</td>
-                <td>
-                    <button class="delete-btn" onclick="deleteUser(${u.id})">Delete</button>
-                    <button class="make-btn" onclick="makeAdmin(${u.id})">Make Admin</button>
-                    <button class="remove-btn" onclick="removeAdmin(${u.id})">Remove Admin</button>
-                </td>
-            </tr>`;
+        .then(res => res.json())
+        .then(data => {
+            const body = document.getElementById('userTable');
+            body.innerHTML = data.map(u => `
+                <tr>
+                    <td>${u.id}</td>
+                    <td><strong>${u.username}</strong></td>
+                    <td><span class="risk-badge ${u.role === 'Admin' ? 'risk-high' : 'risk-info'}">${u.role}</span></td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})"><i class="fas fa-trash"></i> Delete</button>
+                        <button class="btn btn-success btn-sm" onclick="makeAdmin(${u.id})"><i class="fas fa-user-shield"></i> Make Admin</button>
+                        <button class="btn btn-secondary btn-sm" onclick="removeAdmin(${u.id})"><i class="fas fa-user-minus"></i> Remove Admin</button>
+                    </td>
+                </tr>
+            `).join('');
+            document.getElementById('sys-total-users').innerText = data.length;
         });
-
-        document.getElementById("userTable").innerHTML = html;
-    });
 }
 
-function deleteUser(id){
-    if(confirm("Are you sure you want to delete this user?")){
-        fetch('/admin/delete_user/' + id, { method: 'DELETE' })
+function loadSystemStats() {
+    fetch('/api/risk/overview')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('sys-total-scans').innerText = data.total_scans || 0;
+            document.getElementById('sys-total-vulns').innerText = data.total_vulnerabilities || 0;
+            document.getElementById('sys-total-assets').innerText = data.total_assets || 0;
+        });
+}
+
+function deleteUser(id) {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    fetch('/admin/delete_user/' + id, { method: 'DELETE' })
         .then(() => loadUsers());
-    }
 }
 
-function makeAdmin(id){
+function makeAdmin(id) {
     fetch('/admin/make_admin/' + id)
-    .then(() => loadUsers());
+        .then(() => loadUsers());
 }
 
-function removeAdmin(id){
+function removeAdmin(id) {
     fetch('/admin/remove_admin/' + id)
-    .then(() => loadUsers());
+        .then(() => loadUsers());
 }
 
-loadUsers();
-</script>
+function openCreateUser() {
+    document.getElementById('createUserModal').style.display = 'block';
+}
 
-</body>
-</html>
+function closeCreateUser() {
+    document.getElementById('createUserModal').style.display = 'none';
+}
+
+function confirmCreateUser() {
+    const u = document.getElementById('new_username').value.trim();
+    const p = document.getElementById('new_password').value;
+    const a = document.getElementById('new_is_admin').checked;
+    if (!u || !p) return alert("Username and Password required");
+
+    const data = new URLSearchParams();
+    data.append("username", u);
+    data.append("password", p);
+    if (a) data.append("is_admin", "on");
+
+    axios.post("/admin/add_user", data)
+        .then(res => {
+            alert("User created successfully!");
+            closeCreateUser();
+            loadUsers();
+        })
+        .catch(err => alert(err.response?.data?.error || "Failed to create user"));
+}
+
+function loadAuditLogs() {
+    document.getElementById("auditModal").style.display = "block";
+    fetch("/admin/audit_logs")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("auditList").innerHTML = data.length === 0
+                ? '<div class="empty-state">No activities logged.</div>'
+                : '<table style="width:100%; border-spacing:0;"><thead><tr><th style="background:var(--bg-secondary); padding:8px;">User</th><th style="background:var(--bg-secondary);">Action</th><th style="background:var(--bg-secondary);">Details</th><th style="background:var(--bg-secondary);">Date</th></tr></thead><tbody>' +
+                  data.map(log => `<tr>
+                      <td style="padding:6px; border-bottom:1px solid var(--glass-border);">${log.user}</td>
+                      <td style="padding:6px; border-bottom:1px solid var(--glass-border); color:var(--accent-primary);">${log.action}</td>
+                      <td style="padding:6px; border-bottom:1px solid var(--glass-border);">${log.details}</td>
+                      <td style="padding:6px; border-bottom:1px solid var(--glass-border); color:var(--text-secondary);">${log.date}</td>
+                  </tr>`).join('') + '</tbody></table>';
+        });
+}
+
+function closeAudit() {
+    document.getElementById("auditModal").style.display = "none";
+}
+
+function loadErrorLogs() {
+    document.getElementById("errorModal").style.display = "block";
+    fetch("/admin/error_logs")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("errorList").innerHTML = data.length === 0
+                ? '<div class="empty-state">✅ No scan errors detected.</div>'
+                : '<table style="width:100%; border-spacing:0; font-size:0.75rem;"><thead><tr><th>Scan ID</th><th>Error</th><th>Date</th></tr></thead><tbody>' +
+                  data.map(l => `<tr><td style="padding:6px;">${l.scan_id || 'N/A'}</td><td style="padding:6px; color:var(--danger);">${l.message}</td><td style="padding:6px; color:var(--text-secondary);">${l.date}</td></tr>`).join('') +
+                  '</tbody></table>';
+        });
+}
+
+function closeError() {
+    document.getElementById("errorModal").style.display = "none";
+}
+</script>
+{% endblock %}

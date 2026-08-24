@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Scheduled Scans - VigiScan{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="breadcrumb">
+        <a href="/dashboard">Dashboard</a> <span class="sep">/</span> <span>Scheduled Scans</span>
+    </div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Scheduled Scans</h1>
+            <p class="page-subtitle">Schedule recurring vulnerability assessments</p>
+        </div>
+        <a href="/scans" class="btn btn-secondary"><i class="fas fa-search"></i> Back to Scans</a>
+    </div>
+
+    <div class="card">
+        <h3>📅 Create New Schedule</h3>
+        <div class="form-grid">
+            <div>
+                <label>Target URL / IP</label>
+                <input type="text" id="sched_target" placeholder="https://example.com">
+            </div>
+            <div>
+                <label>Scan Profile</label>
+                <select id="sched_profile">
+                    <option value="deep">Deep Scan (ZAP + Nmap + Active Scan)</option>
+                    <option value="quick">Quick Scan (ZAP + Nmap - No Active Scan)</option>
+                    <option value="targeted_ports">Targeted: Ports Only (Nmap)</option>
+                    <option value="targeted_web">Targeted: Web Only (ZAP Spider)</option>
+                </select>
+            </div>
+            <div>
+                <label>Frequency</label>
+                <select id="sched_freq">
+                    <option value="daily">🔁 Daily</option>
+                    <option value="weekly">📆 Weekly</option>
+                    <option value="monthly">🗓️ Monthly</option>
+                </select>
+            </div>
+            <div>
+                <label>Start Date & Time</label>
+                <input type="datetime-local" id="sched_time">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="confirmSchedule()"><i class="fas fa-calendar-check"></i> Schedule Scan</button>
+        <div id="scheduleMsg" class="mt-1 text-small"></div>
+    </div>
+
+    <div class="card">
+        <h3>📋 Active Schedules</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Next Run</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="schedulesBody">
+                    <tr><td colspan="3" class="empty-state">Loading schedules...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadSchedules);
+
+function loadSchedules() {
+    fetch('/api/schedules')
+        .then(res => res.json())
+        .then(data => {
+            const body = document.getElementById('schedulesBody');
+            if (data.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="empty-state">No scheduled scans. Create one above.</td></tr>';
+                return;
+            }
+            body.innerHTML = data.map(j => `
+                <tr>
+                    <td><strong>${j.target}</strong></td>
+                    <td>${j.next_run ? new Date(j.next_run).toLocaleString() : 'Paused'}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="cancelSchedule('${j.id}')"><i class="fas fa-times"></i> Cancel</button>
+                    </td>
+                </tr>
+            `).join('');
+        });
+}
+
+function confirmSchedule() {
+    const target = document.getElementById('sched_target').value.trim();
+    const profile = document.getElementById('sched_profile').value;
+    const freq = document.getElementById('sched_freq').value;
+    const time = document.getElementById('sched_time').value;
+
+    if (!target) { document.getElementById('scheduleMsg').innerHTML = '<span style="color:var(--danger);">⚠️ Please enter a target URL.</span>'; return; }
+    if (!time) { document.getElementById('scheduleMsg').innerHTML = '<span style="color:var(--danger);">⚠️ Please select a start time.</span>'; return; }
+
+    axios.post('/schedule', { target, profile, frequency: freq, start_time: time })
+        .then(res => {
+            document.getElementById('scheduleMsg').innerHTML = `<span style="color:var(--success);">✅ ${res.data.message || 'Scan scheduled successfully!'}</span>`;
+            document.getElementById('sched_target').value = '';
+            loadSchedules();
+        })
+        .catch(err => {
+            const msg = err.response?.data?.error || 'Failed to schedule scan.';
+            document.getElementById('scheduleMsg').innerHTML = `<span style="color:var(--danger);">❌ ${msg}</span>`;
+        });
+}
+
+function cancelSchedule(jobId) {
+    if (!confirm("Stop this recurring scan?")) return;
+    axios.post(`/cancel_schedule/${jobId}`)
+        .then(() => loadSchedules());
+}
+</script>
+{% endblock %}
